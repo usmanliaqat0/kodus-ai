@@ -2,6 +2,7 @@ import { OrganizationAndTeamData } from '@/config/types/general/organizationAndT
 import { PlatformType } from '../domain/enums/platform-type.enum';
 import { LabelType } from '../utils/codeManagement/labels';
 import { SeverityLevel } from '../utils/enums/severityLevel.enum';
+import { ISuggestion } from '@/core/domain/pullRequests/interfaces/pullRequests.interface';
 
 export enum IssueStatus {
     DISMISSED = 'dismissed',
@@ -47,6 +48,9 @@ export interface IIssue {
         fullName: string;
         url: string;
     };
+    suggestion?: ISuggestion;
+    prUrl?: string;
+    provider?: string;
 }
 
 export interface IIssueDetails {
@@ -60,15 +64,16 @@ export interface IIssueDetails {
         label: string;
         url: string;
     };
-    prLinks: {
+    prLink: {
         label: string;
         url: string;
-    }[];
+    };
     repositoryLink: {
         label: string;
         url: string;
     };
-    currentCode: string;
+    existingCode: string;
+    improvedCode: string;
     language: string;
     startLine: number;
     endLine: number;

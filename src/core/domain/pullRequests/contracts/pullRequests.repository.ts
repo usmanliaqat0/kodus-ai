@@ -61,6 +61,9 @@ export interface IPullRequestsRepository {
         organizationId: string,
         filters: IssuesFilters,
     ): Promise<any[]>;
+    findIssueById(
+        suggestionId: string,
+    ): Promise<any>;
 
     addFileToPullRequest(
         pullRequestNumber: number,

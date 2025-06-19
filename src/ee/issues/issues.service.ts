@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { IIssue, IssuesFilters } from '@/shared/interfaces/issues.interface';
+import { IIssue, IIssueDetails, IssuesFilters } from '@/shared/interfaces/issues.interface';
 import {
     IPullRequestsService,
     PULL_REQUESTS_SERVICE_TOKEN,
@@ -20,6 +20,14 @@ export class IssuesService {
         return this.pullRequestsService.findIssuesWithFilters(
             organizationId,
             filters,
+        );
+    }
+
+    async findIssueById(
+        suggestionId: string,
+    ): Promise<IIssue> {
+        return this.pullRequestsService.findIssueById(
+            suggestionId,
         );
     }
 

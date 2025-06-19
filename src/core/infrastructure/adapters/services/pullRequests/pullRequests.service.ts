@@ -134,6 +134,12 @@ export class PullRequestsService implements IPullRequestsService {
         );
     }
 
+    async findIssueById(
+        suggestionId: string,
+    ): Promise<any | null> {
+        return this.pullRequestsRepository.findIssueById(suggestionId);
+    }
+
     //#endregion
 
     //#region Add

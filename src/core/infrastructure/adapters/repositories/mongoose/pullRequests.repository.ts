@@ -501,6 +501,57 @@ export class PullRequestsRepository implements IPullRequestsRepository {
         const result = await this.pullRequestsModel.aggregate(pipeline).exec();
         return result;
     }
+
+    async findIssueById(
+        suggestionId: string,
+    ): Promise<any | null> {
+        const pipeline: any[] = [
+            // Unwind dos files
+            { $unwind: '$files' },
+
+            // Unwind das suggestions
+            { $unwind: '$files.suggestions' },
+
+            // Match da suggestion específica
+            { $match: { 'files.suggestions.id': suggestionId } },
+
+            // Projetar os dados necessários
+            {
+                $project: {
+                    _id: 0,
+                    prId: '$_id',
+                    prNumber: '$number',
+                    prTitle: '$title',
+                    prStatus: '$status',
+                    prUrl: '$url',
+                    createdAt: '$createdAt',
+                    closedAt: '$closedAt',
+                    prAuthor: {
+                        id: '$user.id',
+                        username: '$user.username',
+                        name: '$user.name',
+                    },
+                    repository: {
+                        id: '$repository.id',
+                        name: '$repository.name',
+                        fullName: '$repository.fullName',
+                        url: '$repository.url',
+                    },
+                    file: {
+                        id: '$files.id',
+                        path: '$files.path',
+                        filename: '$files.filename',
+                    },
+                    suggestion: '$files.suggestions',
+                    organizationId: '$organizationId',
+                    provider: '$provider',
+                },
+            },
+        ];
+
+        const result = await this.pullRequestsModel.aggregate(pipeline).exec();
+        return result.length > 0 ? result[0] : null;
+    }
     //#endregion
 
     //#region Add

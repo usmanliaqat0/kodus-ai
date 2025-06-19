@@ -1,234 +1,159 @@
-// import {
-//     IIssuesService,
-//     ISSUES_SERVICE_TOKEN,
-// } from '@/core/domain/issues/contracts/issues.service.contract';
-// import { IUseCase } from '@/shared/domain/interfaces/use-case.interface';
-// import { Inject, Injectable } from '@nestjs/common';
-// import { IssuesEntity } from '@/core/domain/issues/entities/issues.entity';
-// import {
-//     CODE_REVIEW_FEEDBACK_SERVICE_TOKEN,
-//     ICodeReviewFeedbackService,
-// } from '@/core/domain/codeReviewFeedback/contracts/codeReviewFeedback.service.contract';
-// import { PlatformType } from '@/shared/domain/enums/platform-type.enum';
-// import { IIssueDetails } from '@/ee/kodyIssuesManagement/domain/kodyIssuesManagement.interface';
-// import { KodyIssuesManagementService } from '@/ee/kodyIssuesManagement/service/kodyIssuesManagement.service';
-// import { KODY_ISSUES_MANAGEMENT_SERVICE_TOKEN } from '@/core/domain/codeBase/contracts/KodyIssuesManagement.contract';
+import { IUseCase } from '@/shared/domain/interfaces/use-case.interface';
+import { Inject, Injectable } from '@nestjs/common';
 
-// @Injectable()
-// export class GetIssueByIdUseCase implements IUseCase {
-//     constructor(
-//         @Inject(ISSUES_SERVICE_TOKEN)
-//         private readonly issuesService: IIssuesService,
+import {
+    CODE_REVIEW_FEEDBACK_SERVICE_TOKEN,
+    ICodeReviewFeedbackService,
+} from '@/core/domain/codeReviewFeedback/contracts/codeReviewFeedback.service.contract';
+import { PlatformType } from '@/shared/domain/enums/platform-type.enum';
+import { IssuesService } from '@/ee/issues/issues.service';
+import { IIssue, IIssueDetails } from '@/shared/interfaces/issues.interface';
 
-//         @Inject(CODE_REVIEW_FEEDBACK_SERVICE_TOKEN)
-//         private readonly codeReviewFeedbackService: ICodeReviewFeedbackService,
+@Injectable()
+export class GetIssueByIdUseCase implements IUseCase {
+    constructor(
+        private readonly issuesService: IssuesService,
 
-//         @Inject(KODY_ISSUES_MANAGEMENT_SERVICE_TOKEN)
-//         private readonly kodyIssuesManagementService: KodyIssuesManagementService,
-//     ) {}
+        @Inject(CODE_REVIEW_FEEDBACK_SERVICE_TOKEN)
+        private readonly codeReviewFeedbackService: ICodeReviewFeedbackService,
+    ) {}
 
-//     async execute(id: string): Promise<IIssueDetails | null> {
-//         const issue = await this.issuesService.findById(id);
+    async execute(id: string): Promise<IIssueDetails | null> {
+        const issue = await this.issuesService.findIssueById(id);
 
-//         if (!issue) {
-//             return null;
-//         }
+        if (!issue) {
+            return null;
+        }
 
-//         const codeReviewFeedback =
-//             await this.codeReviewFeedbackService.getByOrganizationId(
-//                 issue.organizationId,
-//             );
+        const codeReviewFeedback =
+            await this.codeReviewFeedbackService.getByOrganizationId(
+                issue.organizationId,
+            );
 
-//         const reactions = await this.calculateTotalReactions(
-//             issue,
-//             codeReviewFeedback,
-//         );
-//         const prUrls = await this.selectAllPrNumbers(issue);
+        const reactions = await this.calculateTotalReactions(
+            issue,
+            codeReviewFeedback,
+        );
 
-//         const dataToBuildUrls = {
-//             platform: issue.repository.platform,
-//             repositoryName: issue.repository.name,
-//             repositoryFullName: issue.repository.full_name,
-//         };
+        const dataToBuildUrls = {
+            platform: issue.provider as PlatformType,
+            repositoryName: issue.repository.name,
+            repositoryFullName: issue.repository.fullName,
+        };
 
-//         const { status, filteredContributingSuggestions } =
-//             await this.kodyIssuesManagementService.determineIssueStatusAndFilterSuggestions(
-//                 issue,
-//             );
+        return {
+            title: issue.title,
+            description: issue.description,
+            age: await this.issuesService.ageCalculation(issue),
+            label: issue.label,
+            severity: issue.severity,
+            status: issue.status,
+            fileLink: {
+                label: issue.filePath,
+                url: this.buildFileUrl(dataToBuildUrls, issue.file.path),
+            },
+            prLink:
+                {
+                    label: issue.prNumber.toString(),
+                    url: issue.prUrl || '',
+                },
+            repositoryLink: {
+                label: issue.repository.name,
+                url: this.buildRepositoryUrl(dataToBuildUrls),
+            },
+            existingCode: issue.suggestion.existingCode,
+            improvedCode: issue.suggestion.improvedCode,
+            language: issue.language,
+            startLine: issue.suggestion.relevantLinesStart,
+            endLine: issue.suggestion.relevantLinesEnd,
+            reactions,
+            gitOrganizationName: issue.repository.fullName.split('/')[0],
+            platform: issue.provider as PlatformType,
+        };
+    }
 
-//         return {
-//             title: issue.title,
-//             description: issue.description,
-//             age: await this.kodyIssuesManagementService.ageCalculation(issue),
-//             label: issue.label,
-//             severity: issue.severity,
-//             status: status,
-//             contributingSuggestions: filteredContributingSuggestions,
-//             fileLink: {
-//                 label: issue.filePath,
-//                 url: this.buildFileUrl(dataToBuildUrls, issue.filePath),
-//             },
-//             prLinks: prUrls.map((pr) => ({
-//                 label: pr.number,
-//                 url: pr.url,
-//             })),
-//             repositoryLink: {
-//                 label: issue.repository.name,
-//                 url: this.buildRepositoryUrl(dataToBuildUrls),
-//             },
-//             currentCode: issue.representativeSuggestion.existingCode,
-//             language: issue.language,
-//             startLine: issue.representativeSuggestion.relevantLinesStart,
-//             endLine: issue.representativeSuggestion.relevantLinesEnd,
-//             reactions,
-//             gitOrganizationName: issue.repository.full_name.split('/')[0],
-//         };
-//     }
+    //#region Auxiliary functions
+    private async calculateTotalReactions(
+        issue: IIssue,
+        codeReviewFeedback: any[],
+    ): Promise<{ thumbsUp: number; thumbsDown: number }> {
+        const suggestionIds = new Set<string>();
 
-//     //#region Auxiliary functions
-//     private async calculateTotalReactions(
-//         issue: IssuesEntity,
-//         codeReviewFeedback: any[],
-//     ): Promise<{ thumbsUp: number; thumbsDown: number }> {
-//         const suggestionIds = new Set<string>();
+        if (issue.suggestion?.id) {
+            suggestionIds.add(issue.suggestion.id);
+        }
 
-//         if (issue.contributingSuggestions?.length) {
-//             issue.contributingSuggestions.forEach((suggestion) => {
-//                 if (suggestion.id) {
-//                     suggestionIds.add(suggestion.id);
-//                 }
-//             });
-//         }
+        const allRelevantFeedbacks = codeReviewFeedback.filter(
+            (feedback) =>
+                feedback?.suggestionId &&
+                suggestionIds.has(feedback.suggestionId),
+        );
 
-//         const allRelevantFeedbacks = codeReviewFeedback.filter(
-//             (feedback) =>
-//                 feedback?.suggestionId &&
-//                 suggestionIds.has(feedback.suggestionId),
-//         );
+        let totalThumbsUp = 0;
+        let totalThumbsDown = 0;
 
-//         let totalThumbsUp = 0;
-//         let totalThumbsDown = 0;
+        allRelevantFeedbacks.forEach((feedback) => {
+            if (feedback.reactions) {
+                if (typeof feedback.reactions.thumbsUp === 'number') {
+                    totalThumbsUp += feedback.reactions.thumbsUp;
+                }
+                if (typeof feedback.reactions.thumbsDown === 'number') {
+                    totalThumbsDown += feedback.reactions.thumbsDown;
+                }
+            }
+        });
 
-//         allRelevantFeedbacks.forEach((feedback) => {
-//             if (feedback.reactions) {
-//                 if (typeof feedback.reactions.thumbsUp === 'number') {
-//                     totalThumbsUp += feedback.reactions.thumbsUp;
-//                 }
-//                 if (typeof feedback.reactions.thumbsDown === 'number') {
-//                     totalThumbsDown += feedback.reactions.thumbsDown;
-//                 }
-//             }
-//         });
+        return {
+            thumbsUp: totalThumbsUp,
+            thumbsDown: totalThumbsDown,
+        };
+    }
+    //#endregion
 
-//         return {
-//             thumbsUp: totalThumbsUp,
-//             thumbsDown: totalThumbsDown,
-//         };
-//     }
+    //#region Build URLs
+    private buildFileUrl(
+        data: {
+            platform: PlatformType;
+            repositoryName: string;
+            repositoryFullName: string;
+        },
+        filePath: string,
+        branch: string = 'main',
+    ): string {
+        const cleanFilePath = filePath?.startsWith('/')
+            ? filePath.substring(1)
+            : filePath;
 
-//     private async selectAllPrNumbers(issue: IssuesEntity): Promise<
-//         {
-//             number: string;
-//             url: string;
-//         }[]
-//     > {
-//         const prNumbers = new Set<string>();
+        switch (data.platform) {
+            case PlatformType.GITHUB:
+                return `https://github.com/${data.repositoryFullName}/blob/${branch}/${cleanFilePath}`;
+            case PlatformType.GITLAB:
+                return `https://gitlab.com/${data.repositoryFullName}/-/blob/${branch}/${cleanFilePath}`;
+            case PlatformType.AZURE_REPOS:
+                return `https://dev.azure.com/${data.repositoryFullName}/_git/${data.repositoryName}?path=/${cleanFilePath}`;
+            case PlatformType.BITBUCKET:
+                return `https://bitbucket.org/${data.repositoryFullName}/src/${branch}/${cleanFilePath}`;
+            default:
+                throw new Error(`Plataforma não suportada: ${data.platform}`);
+        }
+    }
 
-//         if (issue.contributingSuggestions?.length) {
-//             issue.contributingSuggestions.forEach((suggestion) => {
-//                 if (suggestion.prNumber) {
-//                     prNumbers.add(suggestion.prNumber.toString());
-//                 }
-//             });
-//         }
-
-//         const dataToBuildUrls = {
-//             platform: issue.repository.platform,
-//             repositoryName: issue.repository.name,
-//             repositoryFullName: issue.repository.full_name,
-//         };
-
-//         const repositoryUrl = this.buildRepositoryUrl(dataToBuildUrls);
-
-//         issue.repository.url = repositoryUrl;
-
-//         const orderedPrNumbers = Array.from(prNumbers).sort(
-//             (a, b) => parseInt(a) - parseInt(b),
-//         );
-
-//         return orderedPrNumbers.map((prNumber) => ({
-//             number: prNumber,
-//             url: this.buildPullRequestUrl(dataToBuildUrls, prNumber),
-//         }));
-//     }
-//     //#endregion
-
-//     //#region Build URLs
-//     private buildFileUrl(
-//         data: {
-//             platform: PlatformType;
-//             repositoryName: string;
-//             repositoryFullName: string;
-//         },
-//         filePath: string,
-//         branch: string = 'main',
-//     ): string {
-//         const cleanFilePath = filePath.startsWith('/')
-//             ? filePath.substring(1)
-//             : filePath;
-
-//         switch (data.platform) {
-//             case PlatformType.GITHUB:
-//                 return `https://github.com/${data.repositoryFullName}/blob/${branch}/${cleanFilePath}`;
-//             case PlatformType.GITLAB:
-//                 return `https://gitlab.com/${data.repositoryFullName}/-/blob/${branch}/${cleanFilePath}`;
-//             case PlatformType.AZURE_REPOS:
-//                 return `https://dev.azure.com/${data.repositoryFullName}/_git/${data.repositoryName}?path=/${cleanFilePath}`;
-//             case PlatformType.BITBUCKET:
-//                 return `https://bitbucket.org/${data.repositoryFullName}/src/${branch}/${cleanFilePath}`;
-//             default:
-//                 throw new Error(`Plataforma não suportada: ${data.platform}`);
-//         }
-//     }
-
-//     private buildPullRequestUrl(
-//         data: {
-//             platform: PlatformType;
-//             repositoryName: string;
-//             repositoryFullName: string;
-//         },
-//         prNumber: string,
-//     ): string {
-//         switch (data.platform) {
-//             case PlatformType.GITHUB:
-//                 return `https://github.com/${data.repositoryFullName}/pull/${prNumber}`;
-//             case PlatformType.GITLAB:
-//                 return `https://gitlab.com/${data.repositoryFullName}/-/merge_requests/${prNumber}`;
-//             case PlatformType.AZURE_REPOS:
-//                 return `https://dev.azure.com/${data.repositoryFullName}/_git/${data.repositoryName}/pullrequest/${prNumber}`;
-//             case PlatformType.BITBUCKET:
-//                 return `https://bitbucket.org/${data.repositoryFullName}/pull-requests/${prNumber}`;
-//             default:
-//                 throw new Error(`Plataforma não suportada: ${data.platform}`);
-//         }
-//     }
-
-//     private buildRepositoryUrl(data: {
-//         platform: PlatformType;
-//         repositoryFullName: string;
-//     }): string {
-//         switch (data.platform) {
-//             case PlatformType.GITHUB:
-//                 return `https://github.com/${data.repositoryFullName}`;
-//             case PlatformType.GITLAB:
-//                 return `https://gitlab.com/${data.repositoryFullName}`;
-//             case PlatformType.AZURE_REPOS:
-//                 return `https://dev.azure.com/${data.repositoryFullName}`;
-//             case PlatformType.BITBUCKET:
-//                 return `https://bitbucket.org/${data.repositoryFullName}`;
-//             default:
-//                 throw new Error(`Plataforma não suportada: ${data.platform}`);
-//         }
-//     }
-//     //#endregion
-// }
+    private buildRepositoryUrl(data: {
+        platform: PlatformType;
+        repositoryFullName: string;
+    }): string {
+        switch (data.platform) {
+            case PlatformType.GITHUB:
+                return `https://github.com/${data.repositoryFullName}`;
+            case PlatformType.GITLAB:
+                return `https://gitlab.com/${data.repositoryFullName}`;
+            case PlatformType.AZURE_REPOS:
+                return `https://dev.azure.com/${data.repositoryFullName}`;
+            case PlatformType.BITBUCKET:
+                return `https://bitbucket.org/${data.repositoryFullName}`;
+            default:
+                throw new Error(`Plataforma não suportada: ${data.platform}`);
+        }
+    }
+    //#endregion
+}
