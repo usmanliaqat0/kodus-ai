@@ -61,6 +61,7 @@ import { GlobalParametersModule } from './global-parameters.module';
 import { LicenseModule } from '@/ee/license/license.module';
 import { RuleLikeModule } from './ruleLike.module';
 import { KodyASTModule } from '@/ee/kodyAST/kodyAST.module';
+import { IssuesModule } from './issues.module';
 
 @Module({
     imports: [
@@ -124,6 +125,7 @@ import { KodyASTModule } from '@/ee/kodyAST/kodyAST.module';
         GlobalParametersModule,
         LicenseModule,
         RuleLikeModule,
+        IssuesModule,
     ],
     providers: [
         {
