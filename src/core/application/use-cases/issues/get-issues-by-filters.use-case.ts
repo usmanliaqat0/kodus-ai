@@ -36,19 +36,20 @@ export class GetIssuesByFiltersUseCase implements IUseCase {
 
             const mappedIssues: IIssue[] = await Promise.all(
                 issues.map(async (issue) => ({
-                    uuid: issue.suggestion.id,
+                    id: issue.suggestion.id,
                     title: issue.suggestion.oneSentenceSummary || issue.prTitle,
                     description: issue.suggestion.suggestionContent,
-                    filePath: issue.file.path,
-                    language: issue.suggestion.language,
                     label: issue.suggestion.label,
                     severity: issue.suggestion.severity,
-                    repositoryName: issue.repository.name,
-                    organizationId: filters.organizationId, // Este valor vem dos filtros
-                    status: issue.suggestion.issueStatus,
-                    createdAt: issue.suggestion.createdAt,
-                    updatedAt: issue.suggestion.updatedAt,
+                    language: issue.suggestion.language,
                     age: await this.issuesService.ageCalculation(issue),
+                    status: issue.suggestion.issueStatus,
+                    createdAt: issue.prCreatedAt,
+                    filePath: issue.file.path,
+                    prNumber: issue.prNumber,
+                    prAuthor: issue.prAuthor.name,
+                    repositoryName: issue.repository.name,
+                    organizationId: filters.organizationId,
                 })),
             );
 

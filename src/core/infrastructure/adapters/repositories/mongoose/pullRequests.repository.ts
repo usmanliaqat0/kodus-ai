@@ -467,8 +467,8 @@ export class PullRequestsRepository implements IPullRequestsRepository {
                     prTitle: '$title',
                     prStatus: '$status',
                     prUrl: '$url',
-                    prCreatedAt: '$createdAt',
-                    prClosedAt: '$closedAt',
+                    createdAt: '$createdAt',
+                    closedAt: '$closedAt',
                     prAuthor: {
                         id: '$user.id',
                         username: '$user.username',
@@ -482,8 +482,8 @@ export class PullRequestsRepository implements IPullRequestsRepository {
                     },
                     file: {
                         id: '$files.id',
+                        name: '$files.filename',
                         path: '$files.path',
-                        filename: '$files.filename',
                     },
                     suggestion: '$files.suggestions',
                 },

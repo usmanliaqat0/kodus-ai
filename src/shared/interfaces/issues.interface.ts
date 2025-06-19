@@ -1,7 +1,7 @@
-import { OrganizationAndTeamData } from "@/config/types/general/organizationAndTeamData";
-import { PlatformType } from "../domain/enums/platform-type.enum";
-import { LabelType } from "../utils/codeManagement/labels";
-import { SeverityLevel } from "../utils/enums/severityLevel.enum";
+import { OrganizationAndTeamData } from '@/config/types/general/organizationAndTeamData';
+import { PlatformType } from '../domain/enums/platform-type.enum';
+import { LabelType } from '../utils/codeManagement/labels';
+import { SeverityLevel } from '../utils/enums/severityLevel.enum';
 
 export enum IssueStatus {
     DISMISSED = 'dismissed',
@@ -22,19 +22,31 @@ export type IssuesFilters = {
 };
 
 export interface IIssue {
-    uuid?: string;
+    id: string;
     title: string;
     description: string;
-    filePath: string;
-    language: string;
     label: LabelType;
     severity: SeverityLevel;
+    language: string;
+    age: string;
+    status: IssueStatus;
+    createdAt: string;
+    filePath: string;
+    prNumber: number;
+    prAuthor: string;
     repositoryName: string;
     organizationId: string;
-    age?: string;
-    status?: IssueStatus;
-    createdAt: string;
-    updatedAt: string;
+    file?: {
+        id: string;
+        name: string;
+        path: string;
+    };
+    repository?: {
+        id: string;
+        name: string;
+        fullName: string;
+        url: string;
+    };
 }
 
 export interface IIssueDetails {
