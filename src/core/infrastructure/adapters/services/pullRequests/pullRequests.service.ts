@@ -20,6 +20,7 @@ import { OrganizationAndTeamData } from '@/config/types/general/organizationAndT
 import { PlatformType } from '@/shared/domain/enums/platform-type.enum';
 import { DeliveryStatus } from '@/core/domain/pullRequests/enums/deliveryStatus.enum';
 import { Repository } from '@/config/types/general/codeReview.type';
+import { IssuesFilters } from '@/shared/interfaces/issues.interface';
 
 @Injectable()
 export class PullRequestsService implements IPullRequestsService {
@@ -120,6 +121,16 @@ export class PullRequestsService implements IPullRequestsService {
             repository,
             status,
             syncedEmbeddedSuggestions,
+        );
+    }
+
+    async findIssuesWithFilters(
+        organizationId: string,
+        filters: IssuesFilters = {},
+    ): Promise<any[]> {
+        return this.pullRequestsRepository.findIssuesWithFilters(
+            organizationId,
+            filters,
         );
     }
 

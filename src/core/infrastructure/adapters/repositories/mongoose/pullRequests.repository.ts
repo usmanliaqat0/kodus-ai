@@ -18,6 +18,7 @@ import { DeliveryStatus } from '@/core/domain/pullRequests/enums/deliveryStatus.
 import { PullRequestState } from '@/shared/domain/enums/pullRequestState.enum';
 import { Repository } from '@/config/types/general/codeReview.type';
 import { OrganizationAndTeamData } from '@/config/types/general/organizationAndTeamData';
+import { IssuesFilters } from '@/shared/interfaces/issues.interface';
 
 @Injectable()
 export class PullRequestsRepository implements IPullRequestsRepository {
@@ -335,6 +336,167 @@ export class PullRequestsRepository implements IPullRequestsRepository {
         }
     }
 
+    async findIssuesWithFilters(
+        organizationId: string,
+        filters: IssuesFilters = {},
+    ): Promise<any[]> {
+        const discardedStatuses = [
+            'discarded-by-safeguard',
+            'discarded-by-kody-fine-tuning',
+            'discarded-by-code-diff',
+        ];
+
+        const matchStage: any = {
+            organizationId,
+            'files.suggestions': { $exists: true, $ne: [] },
+        };
+
+        // Filtros opcionais no nível do PR
+        if (filters.repositoryName) {
+            matchStage['repository.name'] = {
+                $regex: filters.repositoryName,
+                $options: 'i',
+            };
+        }
+
+        if (filters.prNumber) {
+            matchStage.number = filters.prNumber;
+        }
+
+        if (filters.prAuthor) {
+            matchStage['user.username'] = filters.prAuthor;
+        }
+
+        if (filters.startDate || filters.endDate) {
+            matchStage.createdAt = {};
+            if (filters.startDate) {
+                matchStage.createdAt.$gte = filters.startDate;
+            }
+            if (filters.endDate) {
+                matchStage.createdAt.$lte = filters.endDate;
+            }
+        }
+
+        const pipeline: any[] = [
+            // Match inicial dos PRs
+            { $match: matchStage },
+
+            // Unwind dos files
+            { $unwind: '$files' },
+
+            // Match do fileName se especificado
+            ...(filters.fileName
+                ? [
+                      {
+                          $match: {
+                              'files.path': {
+                                  $regex: filters.fileName,
+                                  $options: 'i',
+                              },
+                          },
+                      },
+                  ]
+                : []),
+
+            // Garantir que o file tem suggestions
+            { $match: { 'files.suggestions': { $exists: true, $ne: [] } } },
+
+            // Unwind das suggestions
+            { $unwind: '$files.suggestions' },
+
+            // Filtrar suggestions inválidas
+            {
+                $match: {
+                    'files.suggestions.implementationStatus': {
+                        $ne: 'implemented',
+                    },
+                    'files.suggestions.priorityStatus': {
+                        $nin: discardedStatuses,
+                    },
+                },
+            },
+
+            // Adicionar campo issueStatus default se não existir
+            {
+                $addFields: {
+                    'files.suggestions.issueStatus': {
+                        $ifNull: [
+                            '$files.suggestions.issueStatus',
+                            'dismissed',
+                        ],
+                    },
+                },
+            },
+
+            // Filtrar por issueStatus
+            {
+                $match: {
+                    'files.suggestions.issueStatus':
+                        filters.issueStatus || 'open',
+                },
+            },
+
+            // Filtros específicos das suggestions
+            ...(filters.label
+                ? [
+                      {
+                          $match: { 'files.suggestions.label': filters.label },
+                      },
+                  ]
+                : []),
+
+            ...(filters.severity
+                ? [
+                      {
+                          $match: {
+                              'files.suggestions.severity': filters.severity,
+                          },
+                      },
+                  ]
+                : []),
+
+            {
+                $project: {
+                    _id: 0,
+                    prId: '$_id',
+                    prNumber: '$number',
+                    prTitle: '$title',
+                    prStatus: '$status',
+                    prUrl: '$url',
+                    prCreatedAt: '$createdAt',
+                    prClosedAt: '$closedAt',
+                    prAuthor: {
+                        id: '$user.id',
+                        username: '$user.username',
+                        name: '$user.name',
+                    },
+                    repository: {
+                        id: '$repository.id',
+                        name: '$repository.name',
+                        fullName: '$repository.fullName',
+                        url: '$repository.url',
+                    },
+                    file: {
+                        id: '$files.id',
+                        path: '$files.path',
+                        filename: '$files.filename',
+                    },
+                    suggestion: '$files.suggestions',
+                },
+            },
+
+            {
+                $sort: {
+                    'suggestion.severity': 1,
+                    'suggestion.rankScore': -1,
+                    'prCreatedAt': -1,
+                },
+            },
+        ];
+
+        const result = await this.pullRequestsModel.aggregate(pipeline).exec();
+        return result;
+    }
     //#endregion
 
     //#region Add

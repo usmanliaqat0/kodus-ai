@@ -8,6 +8,7 @@ import { DeliveryStatus } from '../enums/deliveryStatus.enum';
 import { PullRequestState } from '@/shared/domain/enums/pullRequestState.enum';
 import { Repository } from '@/config/types/general/codeReview.type';
 import { OrganizationAndTeamData } from '@/config/types/general/organizationAndTeamData';
+import { IssuesFilters } from '@/shared/interfaces/issues.interface';
 
 export const PULL_REQUESTS_REPOSITORY_TOKEN = Symbol('PullRequestsRepository');
 
@@ -56,6 +57,10 @@ export interface IPullRequestsRepository {
         status?: PullRequestState,
         syncedEmbeddedSuggestions?: boolean,
     ): Promise<IPullRequests[]>;
+    findIssuesWithFilters(
+        organizationId: string,
+        filters: IssuesFilters,
+    ): Promise<any[]>;
 
     addFileToPullRequest(
         pullRequestNumber: number,
