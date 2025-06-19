@@ -348,7 +348,11 @@ export class PullRequestsRepository implements IPullRequestsRepository {
 
         const matchStage: any = {
             organizationId,
-            'files.suggestions': { $exists: true, $ne: [] },
+            files: {
+                $elemMatch: {
+                    suggestions: { $exists: true, $not: { $size: 0 } },
+                },
+            },
         };
 
         // Filtros opcionais no nível do PR
