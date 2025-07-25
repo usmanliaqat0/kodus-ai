@@ -8,6 +8,7 @@ import { REQUEST } from '@nestjs/core';
 import { FindRulesInOrganizationByRuleFilterKodyRulesUseCase } from '../../kodyRules/find-rules-in-organization-by-filter.use-case';
 import { KodyRulesStatus } from '@/core/domain/kodyRules/interfaces/kodyRules.interface';
 import { ChangeStatusKodyRulesUseCase } from '../../kodyRules/change-status-kody-rules.use-case';
+import { SyncRepositoryRulesUseCase } from '../../kodyRules/sync-repository-rules.use-case';
 import {
     IParametersService,
     PARAMETERS_SERVICE_TOKEN,
@@ -25,6 +26,7 @@ export class FinishOnboardingUseCase {
         private readonly generateKodyRulesUseCase: GenerateKodyRulesUseCase,
         private readonly findKodyRulesUseCase: FindRulesInOrganizationByRuleFilterKodyRulesUseCase,
         private readonly changeStatusKodyRulesUseCase: ChangeStatusKodyRulesUseCase,
+        private readonly syncRepositoryRulesUseCase: SyncRepositoryRulesUseCase,
 
         private readonly logger: PinoLoggerService,
 
@@ -91,6 +93,31 @@ export class FinishOnboardingUseCase {
                     ruleIds,
                     status: KodyRulesStatus.ACTIVE,
                 });
+            }
+
+            // Sync repository rule files during onboarding
+            if (repositoryId && repositoryName) {
+                try {
+                    await this.syncRepositoryRulesUseCase.executeOnboarding({
+                        organizationAndTeamData: { organizationId, teamId },
+                        repositoryId,
+                        repositoryName,
+                    });
+
+                    this.logger.log({
+                        message: 'Repository rule files synchronized during onboarding',
+                        context: FinishOnboardingUseCase.name,
+                        metadata: { repositoryId, repositoryName, organizationId, teamId },
+                    });
+                } catch (rulesSyncError) {
+                    // Don't fail onboarding if rule sync fails
+                    this.logger.warn({
+                        message: 'Failed to sync repository rule files during onboarding',
+                        context: FinishOnboardingUseCase.name,
+                        error: rulesSyncError,
+                        metadata: { repositoryId, repositoryName, organizationId, teamId },
+                    });
+                }
             }
 
             if (reviewPR) {

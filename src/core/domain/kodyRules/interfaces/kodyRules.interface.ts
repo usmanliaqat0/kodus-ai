@@ -21,9 +21,9 @@ export interface IKodyRule {
     origin?: KodyRulesOrigin;
     createdAt?: Date;
     updatedAt?: Date;
-    /** Comment generated at runtime – not persisted in the database */
     reason?: string | null;
     scope?: KodyRulesScope;
+    sourceFile?: string;
 }
 
 export interface IKodyRulesExtendedContext {
@@ -39,6 +39,7 @@ export enum KodyRulesOrigin {
     USER = 'user',
     LIBRARY = 'library',
     GENERATED = 'generated',
+    REPOSITORY_FILE = 'repository_file',
 }
 
 export enum KodyRulesStatus {

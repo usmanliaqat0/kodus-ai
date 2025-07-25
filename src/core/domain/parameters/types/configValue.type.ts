@@ -41,6 +41,7 @@ export type PlatformConfigValue = {
     finishOnboard: boolean;
     finishProjectManagementConnection: boolean;
     kodyLearningStatus: KodyLearningStatus;
+    ruleFileSyncStatus: RuleFileSyncStatus;
 };
 
 export enum KodyLearningStatus {
@@ -48,4 +49,10 @@ export enum KodyLearningStatus {
     DISABLED = 'disabled',
     GENERATING_RULES = 'generating_rules',
     GENERATING_CONFIG = 'generating_config',
+}
+
+export enum RuleFileSyncStatus {
+    ENABLED = 'enabled',
+    DISABLED = 'disabled',
+    SYNCING = 'syncing',
 }

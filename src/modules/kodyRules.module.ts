@@ -6,8 +6,10 @@ import {
     KodyRulesSchema,
 } from '@/core/infrastructure/adapters/repositories/mongoose/schema/kodyRules.model';
 import { KodyRulesController } from '@/core/infrastructure/http/controllers/kodyRules.controller';
+import { RuleReconciliationController } from '@/core/infrastructure/http/controllers/admin/ruleReconciliation.controller';
 import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PlatformIntegrationModule } from './platformIntegration.module';
 import { CodebaseModule } from './codeBase.module';
 import { GenerateKodyRulesUseCase } from '@/core/application/use-cases/kodyRules/generate-kody-rules.use-case';
@@ -19,11 +21,17 @@ import { ParametersModule } from './parameters.module';
 import { CreateOrUpdateKodyRulesUseCase } from '@/core/application/use-cases/kodyRules/create-or-update.use-case';
 import { KodyRulesValidationModule } from '@/ee/kodyRules/kody-rules-validation.module';
 import { KodyRulesService } from '@/ee/kodyRules/service/kodyRules.service';
+import { RuleFileSyncService } from '@/ee/kodyRules/services/ruleFileSync.service';
+import { LLMRuleExtractionService } from '@/ee/kodyRules/services/llmRuleExtraction.service';
+import { RuleFileReconciliationService } from '@/ee/kodyRules/services/ruleFileReconciliation.service';
+import { SyncRepositoryRulesUseCase } from '@/core/application/use-cases/kodyRules/sync-repository-rules.use-case';
+import { RULE_FILE_SYNC_SERVICE_TOKEN } from '@/core/domain/kodyRules/interfaces/ruleFileSync.interface';
 import { KodyRulesRepository } from '@/ee/kodyRules/repository/kodyRules.repository';
 import { KodyRulesValidationService } from '@/ee/kodyRules/service/kody-rules-validation.service';
 import { SendRulesNotificationUseCase } from '@/core/application/use-cases/kodyRules/send-rules-notification.use-case';
 import { UsersModule } from './user.module';
 import { OrganizationModule } from './organization.module';
+import { TeamsModule } from './team.module';
 
 @Module({
     imports: [
@@ -40,7 +48,9 @@ import { OrganizationModule } from './organization.module';
         forwardRef(() => ParametersModule),
         forwardRef(() => UsersModule),
         forwardRef(() => OrganizationModule),
+        forwardRef(() => TeamsModule),
         KodyRulesValidationModule,
+        ScheduleModule.forRoot(),
     ],
     providers: [
         ...UseCases,
@@ -52,9 +62,18 @@ import { OrganizationModule } from './organization.module';
             provide: KODY_RULES_SERVICE_TOKEN,
             useClass: KodyRulesService,
         },
+        {
+            provide: RULE_FILE_SYNC_SERVICE_TOKEN,
+            useClass: RuleFileSyncService,
+        },
         KodyRulesValidationService,
+        
+        // Rule file synchronization services
+        LLMRuleExtractionService,
+        RuleFileReconciliationService,
+        SyncRepositoryRulesUseCase,
     ],
-    controllers: [KodyRulesController],
+    controllers: [KodyRulesController, RuleReconciliationController],
     exports: [
         KODY_RULES_REPOSITORY_TOKEN,
         KODY_RULES_SERVICE_TOKEN,
@@ -63,7 +82,10 @@ import { OrganizationModule } from './organization.module';
         ChangeStatusKodyRulesUseCase,
         CreateOrUpdateKodyRulesUseCase,
         SendRulesNotificationUseCase,
+        SyncRepositoryRulesUseCase,
+        RuleFileReconciliationService,
         KodyRulesValidationService,
+        RULE_FILE_SYNC_SERVICE_TOKEN,
     ],
 })
 export class KodyRulesModule {}

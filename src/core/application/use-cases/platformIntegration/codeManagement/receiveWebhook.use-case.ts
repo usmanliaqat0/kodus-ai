@@ -28,6 +28,9 @@ export class ReceiveWebhookUseCase implements IUseCase {
         @Inject('AZURE_REPOS_WEBHOOK_HANDLER')
         private readonly azureReposPullRequestHandler: IWebhookEventHandler,
 
+        @Inject('RULE_FILE_SYNC_WEBHOOK_HANDLER')
+        private readonly ruleFileSyncHandler: IWebhookEventHandler,
+
         private readonly logger: PinoLoggerService,
     ) {
         // Inicializar o mapa de handlers por tipo de plataforma
@@ -41,8 +44,11 @@ export class ReceiveWebhookUseCase implements IUseCase {
 
     public async execute(params: IWebhookEventParams): Promise<void> {
         try {
-            const handler = this.webhookHandlersMap.get(params.platformType);
+            // Array to track executed handlers
+            const executedHandlers: string[] = [];
 
+            // Process primary platform handler
+            const handler = this.webhookHandlersMap.get(params.platformType);
             if (handler && handler.canHandle(params)) {
                 this.logger.debug({
                     message: `Processing ${params.event} with handler ${handler.constructor.name}`,
@@ -55,9 +61,13 @@ export class ReceiveWebhookUseCase implements IUseCase {
                 });
 
                 handler.execute(params);
-            } else {
+                executedHandlers.push(handler.constructor.name);
+            }
+
+            // Process rule file sync handler (runs independently)
+    if (this.ruleFileSyncHandler.canHandle(params)) {
                 this.logger.debug({
-                    message: `No handler found for event ${params.event}`,
+                    message: `Processing ${params.event} with rule file sync handler`,
                     serviceName: ReceiveWebhookUseCase.name,
                     metadata: {
                         eventName: params.event,
@@ -65,7 +75,49 @@ export class ReceiveWebhookUseCase implements IUseCase {
                     },
                     context: ReceiveWebhookUseCase.name,
                 });
+
+                // Execute rule file sync in background
+                setImmediate(() => {
+                    this.ruleFileSyncHandler.execute(params).catch(error => {
+                        this.logger.error({
+                            message: 'Error in rule file sync handler',
+                            context: ReceiveWebhookUseCase.name,
+                            error,
+                            metadata: {
+                                eventName: params.event,
+                                platformType: params.platformType,
+                            },
+                        });
+                    });
+                });
+                
+                executedHandlers.push('RuleFileSyncHandler');
             }
+
+            // Log if no handlers were executed
+            if (executedHandlers.length === 0) {
+                this.logger.debug({
+                    message: `No handlers found for event ${params.event}`,
+                    serviceName: ReceiveWebhookUseCase.name,
+                    metadata: {
+                        eventName: params.event,
+                        platformType: params.platformType,
+                    },
+                    context: ReceiveWebhookUseCase.name,
+                });
+            } else {
+                this.logger.debug({
+                    message: `Executed handlers: ${executedHandlers.join(', ')}`,
+                    serviceName: ReceiveWebhookUseCase.name,
+                    metadata: {
+                        eventName: params.event,
+                        platformType: params.platformType,
+                        executedHandlers,
+                    },
+                    context: ReceiveWebhookUseCase.name,
+                });
+            }
+
         } catch (error) {
             this.logger.error({
                 message: 'Error processing webhook',

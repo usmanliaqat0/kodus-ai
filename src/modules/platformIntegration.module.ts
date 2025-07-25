@@ -51,6 +51,7 @@ import { GitHubPullRequestHandler } from '@/core/infrastructure/adapters/webhook
 import { GitLabMergeRequestHandler } from '@/core/infrastructure/adapters/webhooks/gitlab/gitlabPullRequest.handler';
 import { BitbucketPullRequestHandler } from '@/core/infrastructure/adapters/webhooks/bitbucket/bitbucketPullRequest.handler';
 import { AzureReposPullRequestHandler } from '@/core/infrastructure/adapters/webhooks/azureRepos/azureReposPullRequest.handler';
+import { RuleFileSyncHandler } from '@/core/infrastructure/adapters/webhooks/ruleFileSync/ruleFileSync.handler';
 import { IWebhookEventHandler } from '@/core/domain/platformIntegrations/interfaces/webhook-event-handler.interface';
 import { IssuesModule } from './issues.module';
 @Module({
@@ -119,6 +120,11 @@ import { IssuesModule } from './issues.module';
         {
             provide: 'AZURE_REPOS_WEBHOOK_HANDLER',
             useExisting: AzureReposPullRequestHandler,
+        },
+        RuleFileSyncHandler,
+        {
+            provide: 'RULE_FILE_SYNC_WEBHOOK_HANDLER',
+            useExisting: RuleFileSyncHandler,
         },
     ],
     controllers: [

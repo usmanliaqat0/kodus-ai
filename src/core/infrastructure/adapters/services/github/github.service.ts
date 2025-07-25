@@ -3105,7 +3105,12 @@ export class GithubService
         return response;
     }
 
-    async getRepositoryContentFile(params: any): Promise<any | null> {
+    async getRepositoryContentFile(params: {
+        organizationAndTeamData: OrganizationAndTeamData;
+        repository: { name: string; id: string };
+        file: any;
+        pullRequest: any;
+    }): Promise<any | null> {
         try {
             const { organizationAndTeamData, repository, file, pullRequest } =
                 params;

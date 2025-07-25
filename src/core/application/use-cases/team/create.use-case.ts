@@ -11,6 +11,7 @@ import { ParametersKey } from '@/shared/domain/enums/parameters-key.enum';
 import {
     KodyLearningStatus,
     PlatformConfigValue,
+    RuleFileSyncStatus,
 } from '@/core/domain/parameters/types/configValue.type';
 import { STATUS } from '@/config/types/database/status.type';
 import posthogClient from '@/shared/utils/posthog';
@@ -76,6 +77,7 @@ export class CreateTeamUseCase implements IUseCase {
             finishOnboard: false,
             finishProjectManagementConnection: false,
             kodyLearningStatus: KodyLearningStatus.ENABLED,
+            ruleFileSyncStatus: RuleFileSyncStatus.ENABLED,
         };
 
         return this.createOrUpdateParametersUseCase.execute(
