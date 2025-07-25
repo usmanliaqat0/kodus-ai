@@ -34,6 +34,8 @@ import { CheckinHistoryOrganizationModule } from './checkInHistoryOrganization.m
 import { ParametersModule } from './parameters.module';
 import { CodeReviewAgentProvider } from '@/core/infrastructure/adapters/services/agent/agents/codeReview';
 import { OrganizationParametersModule } from './organizationParameters.module';
+import { ConversationAgentUseCase } from '@/core/application/use-cases/agent/conversation-agent.use-case';
+import { ConversationAgentProvider } from '@/core/infrastructure/adapters/services/agent/kodus-flow/conversationAgent';
 
 @Module({
     imports: [
@@ -63,6 +65,7 @@ import { OrganizationParametersModule } from './organizationParameters.module';
         DefaultAgentProvider,
         CodeReviewAgentProvider,
         GenericQueryAgentProvider,
+        ConversationAgentProvider,
         PromptService,
         S3Service,
         {
@@ -102,6 +105,7 @@ import { OrganizationParametersModule } from './organizationParameters.module';
         AGENT_SERVICE_TOKEN,
         AGENT_EXECUTION_SERVICE_TOKEN,
         AGENT_EXECUTION_REPOSITORY_TOKEN,
+        ConversationAgentUseCase,
     ],
 })
-export class AgentModule { }
+export class AgentModule {}

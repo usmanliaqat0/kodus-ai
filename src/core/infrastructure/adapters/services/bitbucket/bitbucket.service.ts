@@ -3810,7 +3810,12 @@ export class BitbucketService
         language?: string;
         organizationAndTeamData: OrganizationAndTeamData;
     }): Promise<string> {
-        const { suggestion, repository, includeHeader = true, includeFooter = true } = params;
+        const {
+            suggestion,
+            repository,
+            includeHeader = true,
+            includeFooter = true,
+        } = params;
 
         let commentBody = '';
 
@@ -3838,7 +3843,8 @@ export class BitbucketService
 
         // FOOTER - Interação/Feedback (formato Bitbucket)
         if (includeFooter) {
-            commentBody += 'Was this suggestion helpful? reply with 👍 or 👎 to help Kody learn from this interaction.\n\n';
+            commentBody +=
+                'Was this suggestion helpful? reply with 👍 or 👎 to help Kody learn from this interaction.\n\n';
             commentBody += `\`\`\`\n👍\n\`\`\`\n\n\`\`\`\n👎\n\`\`\``;
         }
 
