@@ -261,12 +261,20 @@ export class RuleFileSyncService implements IRuleFileSyncService {
             const repositoryContext =
                 await this.detectRepositoryContext(context);
 
-            // Process each rule file change using LLM
+            // Primeiro, tratar renomeações de arquivos de regras
+            for (const change of ruleFileChanges) {
+                if (change.changeType === RuleFileChangeType.RENAMED && change.previousFilePath) {
+                    await this.processRuleFileRename(change.previousFilePath, change.filePath, context);
+                }
+            }
+
+            // Process each rule file change using LLM (exceto DELETED e RENAMED)
             const processResults = await Promise.all(
                 ruleFileChanges
                     .filter(
                         (change) =>
-                            change.changeType !== RuleFileChangeType.DELETED,
+                            change.changeType !== RuleFileChangeType.DELETED &&
+                            change.changeType !== RuleFileChangeType.RENAMED,
                     )
                     .map((change) =>
                         this.processRuleFileChangeWithLLM(
@@ -898,14 +906,14 @@ export class RuleFileSyncService implements IRuleFileSyncService {
                 },
             });
 
-            // Convert existing rules to a map for easier lookup
+            // Convert existing rules to a map for easier lookup (title + path + sourceFile)
             const existingRulesMap = new Map();
             if (existingKodyRules && existingKodyRules.length > 0) {
                 existingKodyRules.forEach((kodyRule) => {
                     if (kodyRule.rules) {
                         kodyRule.rules.forEach((rule) => {
-                            // Use title + path as unique key
-                            const key = `${rule.title}|${rule.path || ''}`;
+                            // Use title + path + sourceFile as unique key
+                            const key = `${rule.title}|${rule.path || ''}|${rule.sourceFile || ''}`;
                             existingRulesMap.set(key, {
                                 kodyRuleId: kodyRule.uuid,
                                 rule,
@@ -927,7 +935,7 @@ export class RuleFileSyncService implements IRuleFileSyncService {
             // Process each parsed rule
             for (const parsedRule of rules) {
                 try {
-                    const ruleKey = `${parsedRule.title}|${parsedRule.path || ''}`;
+                    const ruleKey = `${parsedRule.title}|${parsedRule.path || ''}|${parsedRule.sourceFile || ''}`;
                     const existingRule = existingRulesMap.get(ruleKey);
 
                     this.logger.debug({
@@ -981,6 +989,7 @@ export class RuleFileSyncService implements IRuleFileSyncService {
                             title: parsedRule.title,
                             rule: parsedRule.rule,
                             path: parsedRule.path,
+                            sourceFile: parsedRule.sourceFile,
                             status: KodyRulesStatus.ACTIVE,
                             severity: parsedRule.severity || 'medium',
                             examples: parsedRule.examples,
@@ -989,7 +998,6 @@ export class RuleFileSyncService implements IRuleFileSyncService {
                             scope: parsedRule.scope,
                             createdAt: new Date(),
                             updatedAt: new Date(),
-                            sourceFile: parsedRule.sourceFile,
                         };
 
                         // Find or create KodyRules document for this repository
@@ -1541,14 +1549,9 @@ export class RuleFileSyncService implements IRuleFileSyncService {
             if (existingKodyRules && existingKodyRules.length > 0) {
                 for (const kodyRule of existingKodyRules) {
                     if (kodyRule.rules) {
-                        // Find rules that came from this deleted file
+                        // Find rules that vieram desse arquivo de origem (sourceFile)
                         const rulesToDelete = kodyRule.rules.filter(
-                            (rule) =>
-                                rule.path === change.filePath ||
-                                rule.path?.endsWith('/' + change.filePath) ||
-                                (rule.origin ===
-                                    KodyRulesOrigin.REPOSITORY_FILE &&
-                                    change.filePath.includes(rule.path || '')),
+                            (rule) => rule.sourceFile === change.filePath,
                         );
 
                         // Deactivate/delete rules from this file
@@ -1616,9 +1619,7 @@ export class RuleFileSyncService implements IRuleFileSyncService {
                 message: 'Failed to process rule file deletion',
                 context: RuleFileSyncService.name,
                 error,
-                metadata: { filePath: change.filePath },
             });
-
             return {
                 created: 0,
                 updated: 0,
@@ -1632,6 +1633,49 @@ export class RuleFileSyncService implements IRuleFileSyncService {
                     },
                 ],
             };
+        }
+    }
+
+    /**
+     * Atualiza o campo sourceFile das regras existentes ao detectar rename de arquivo de regras
+     */
+    private async processRuleFileRename(
+        oldFilePath: string,
+        newFilePath: string,
+        context: IRuleFileSyncContext,
+    ): Promise<void> {
+        // Busca todas as regras com sourceFile = oldFilePath e atualiza para newFilePath
+        const existingKodyRules = await this.kodyRulesService.find({
+            organizationId: context.organizationId,
+            repositoryId: context.repositoryId,
+        } as any);
+
+        if (existingKodyRules && existingKodyRules.length > 0) {
+            for (const kodyRule of existingKodyRules) {
+                if (kodyRule.rules) {
+                    for (const rule of kodyRule.rules) {
+                        if (rule.sourceFile === oldFilePath && rule.uuid) {
+                            await this.kodyRulesService.updateRule(
+                                kodyRule.uuid,
+                                rule.uuid,
+                                {
+                                    sourceFile: newFilePath,
+                                    updatedAt: new Date(),
+                                },
+                            );
+                            this.logger.debug({
+                                message: 'Updated rule sourceFile due to file rename',
+                                context: RuleFileSyncService.name,
+                                metadata: {
+                                    ruleTitle: rule.title,
+                                    oldFilePath,
+                                    newFilePath,
+                                },
+                            });
+                        }
+                    }
+                }
+            }
         }
     }
 }

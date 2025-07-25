@@ -92,6 +92,7 @@ export interface IParsedRuleContent {
     severity?: KodyRuleSeverity;
     scope?: KodyRulesScope;
     path?: string;
+    sourceFile: string; // Caminho do arquivo de origem da regra
     examples?: Array<{
         snippet: string;
         isCorrect: boolean;

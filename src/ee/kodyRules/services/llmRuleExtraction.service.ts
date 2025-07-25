@@ -95,7 +95,7 @@ export class LLMRuleExtractionService {
 
             // Step 3: Convert to IParsedRuleContent format
             const parsedRules = normalizedRules.map((rule) =>
-                this.convertToIParsedRuleContent(rule),
+                this.convertToIParsedRuleContent(rule, filePath),
             );
 
             this.logger.log({
@@ -189,7 +189,9 @@ export class LLMRuleExtractionService {
         // 2️⃣ Consolidation: Collect all rules from successful extractions
         const allExtractedRules = individualResults
             .filter((result) => result.success)
-            .flatMap((result) => result.rules);
+            .flatMap((result) =>
+                result.rules.map((rule) => ({ ...rule, sourceFile: result.filePath }))
+            );
 
         const originalCount = allExtractedRules.length;
 
@@ -316,13 +318,14 @@ export class LLMRuleExtractionService {
     /**
      * Convert LLM output to IParsedRuleContent format
      */
-    private convertToIParsedRuleContent(rule: any): IParsedRuleContent {
+    private convertToIParsedRuleContent(rule: any, filePath?: string): IParsedRuleContent {
         return {
             title: rule.title || 'Untitled Rule',
             rule: rule.rule || rule.description || '',
             severity: this.mapSeverity(rule.severity),
             scope: this.mapScope(rule.scope),
             path: rule.path,
+            sourceFile: filePath,
             examples: rule.examples || [],
             metadata: {
                 language: rule.metadata?.language,
@@ -396,7 +399,7 @@ export class LLMRuleExtractionService {
 
             // Convert back to IParsedRuleContent format
             const deduplicatedRules = deduplicatedRawRules.map((rule) =>
-                this.convertToIParsedRuleContent(rule),
+                this.convertToIParsedRuleContent(rule), // sourceFile já está presente
             );
 
             this.logger.log({
