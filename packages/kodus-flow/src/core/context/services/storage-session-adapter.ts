@@ -48,14 +48,14 @@ export class StorageSessionAdapter implements BaseStorage<SessionStorageItem> {
             options: {
                 ...config.options,
                 // ✅ SESSION: Use specific collection for Session data
-                database: config.options?.database || 'kodus',
-                collection: config.options?.collection || 'sessions',
+                database: config.options?.database ?? 'kodus',
+                collection: config.options?.collection ?? 'sessions',
             },
             maxItems: 1000,
             enableCompression: true,
             cleanupInterval: 300000,
-            timeout: config.timeout || 10000,
-            retries: config.retries || 3,
+            timeout: config.timeout ?? 10000,
+            retries: config.retries ?? 3,
             enableObservability: true,
             enableHealthChecks: true,
             enableMetrics: true,
@@ -77,18 +77,33 @@ export class StorageSessionAdapter implements BaseStorage<SessionStorageItem> {
 
     async store(item: SessionStorageItem): Promise<void> {
         await this.ensureInitialized();
-        await this.storage!.store(item);
+
+        if (!this.storage) {
+            throw new Error('Storage not initialized');
+        }
+
+        await this.storage.store(item);
         logger.debug('Session stored', { sessionId: item.sessionData.id });
     }
 
     async retrieve(id: string): Promise<SessionStorageItem | null> {
         await this.ensureInitialized();
-        return await this.storage!.retrieve(id);
+
+        if (!this.storage) {
+            throw new Error('Storage not initialized');
+        }
+
+        return await this.storage.retrieve(id);
     }
 
     async delete(id: string): Promise<boolean> {
         await this.ensureInitialized();
-        const deleted = await this.storage!.delete(id);
+
+        if (!this.storage) {
+            throw new Error('Storage not initialized');
+        }
+
+        const deleted = await this.storage.delete(id);
         if (deleted) {
             logger.debug('Session deleted', { sessionId: id });
         }
@@ -97,18 +112,33 @@ export class StorageSessionAdapter implements BaseStorage<SessionStorageItem> {
 
     async clear(): Promise<void> {
         await this.ensureInitialized();
-        await this.storage!.clear();
+
+        if (!this.storage) {
+            throw new Error('Storage not initialized');
+        }
+
+        await this.storage.clear();
         logger.info('All sessions cleared');
     }
 
     async getStats(): Promise<BaseStorageStats> {
         await this.ensureInitialized();
-        return await this.storage!.getStats();
+
+        if (!this.storage) {
+            throw new Error('Storage not initialized');
+        }
+
+        return await this.storage.getStats();
     }
 
     async isHealthy(): Promise<boolean> {
         await this.ensureInitialized();
-        return this.storage!.isHealthy();
+
+        if (!this.storage) {
+            throw new Error('Storage not initialized');
+        }
+
+        return this.storage.isHealthy();
     }
 
     async cleanup(): Promise<void> {
@@ -171,7 +201,7 @@ export class StorageSessionAdapter implements BaseStorage<SessionStorageItem> {
                     query['sessionData.tenantId'] = tenantId;
                 }
 
-                const doc = await anyStorage.findOneByQuery!(query);
+                const doc = await anyStorage.findOneByQuery(query);
                 return doc?.sessionData ?? null;
             }
 

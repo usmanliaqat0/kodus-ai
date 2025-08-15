@@ -37,7 +37,7 @@ export interface OptimizedEventProcessorConfig {
 /**
  * Handler com tracking para otimização
  */
-interface TrackedEventHandler extends EventHandler<AnyEvent> {
+interface TrackedEventHandler extends EventHandler {
     _handlerId?: string;
     _lastUsed?: number;
     _isActive?: boolean;
@@ -474,7 +474,7 @@ export class OptimizedEventProcessor {
         context: EventProcessingContext,
     ): Promise<void> {
         // Aplicar middlewares de handler primeiro
-        let wrappedHandler: EventHandler<AnyEvent> = handler;
+        let wrappedHandler: EventHandler = handler;
         for (const middleware of this.handlerMiddlewares) {
             wrappedHandler = middleware(wrappedHandler);
         }

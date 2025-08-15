@@ -62,7 +62,7 @@ function hasCostCtx(x: unknown): x is HasCostCtx {
     return typeof x === 'object' && x !== null && 'ctx' in x;
 }
 
-export const withRetry: MiddlewareFactoryType<Partial<RetryOptions>, Event> = (
+export const withRetry: MiddlewareFactoryType<Partial<RetryOptions>> = (
     opts = {},
 ) => {
     const cfg: RetryOptions = { ...DEFAULT, ...opts };
@@ -124,14 +124,14 @@ export const withRetry: MiddlewareFactoryType<Partial<RetryOptions>, Event> = (
                                 { once: true },
                             );
                         }
-                        if ('unref' in t) (t as NodeJS.Timeout).unref();
+                        if ('unref' in t) t.unref();
                     });
                 }
             }
         };
 
         return wrapped;
-    } as Middleware<Event>;
+    } as Middleware;
 
     middleware.kind = 'pipeline';
     (middleware as unknown as { displayName?: string }).displayName =

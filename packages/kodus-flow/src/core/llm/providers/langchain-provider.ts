@@ -111,7 +111,7 @@ export class LangChainProvider implements LLMProvider {
 
     constructor(llm: LangChainLLM) {
         this.llm = llm;
-        this.name = llm.name || 'langchain-llm';
+        this.name = llm.name ?? 'langchain-llm';
         this.logger.info('LangChain provider initialized', { name: this.name });
     }
 
@@ -268,10 +268,10 @@ export class LangChainProvider implements LLMProvider {
             usage:
                 response && typeof response === 'object' && response.usage
                     ? {
-                          promptTokens: response.usage.promptTokens || 0,
+                          promptTokens: response.usage.promptTokens ?? 0,
                           completionTokens:
-                              response.usage.completionTokens || 0,
-                          totalTokens: response.usage.totalTokens || 0,
+                              response.usage.completionTokens ?? 0,
+                          totalTokens: response.usage.totalTokens ?? 0,
                       }
                     : undefined,
         };

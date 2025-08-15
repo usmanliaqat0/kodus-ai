@@ -1526,10 +1526,7 @@ export class ExecutionKernel {
     /**
      * Register event handler in runtime (SAFE)
      */
-    registerHandler(
-        eventType: EventType,
-        handler: EventHandler<AnyEvent>,
-    ): void {
+    registerHandler(eventType: EventType, handler: EventHandler): void {
         const runtime = this.getRuntimeSafely();
         runtime.on(eventType, handler);
     }
@@ -1537,7 +1534,7 @@ export class ExecutionKernel {
     /**
      * Remove event handler from runtime (SAFE)
      */
-    removeHandler(eventType: EventType, handler: EventHandler<AnyEvent>): void {
+    removeHandler(eventType: EventType, handler: EventHandler): void {
         const runtime = this.getRuntimeSafely();
         runtime.off(eventType, handler);
     }
@@ -2146,10 +2143,9 @@ export class ExecutionKernel {
             const result = await Promise.race([
                 operation(),
                 new Promise<never>((_, reject) =>
-                    setTimeout(
-                        () => reject(new Error('Operation timeout')),
-                        timeout,
-                    ),
+                    setTimeout(() => {
+                        reject(new Error('Operation timeout'));
+                    }, timeout),
                 ),
             ]);
 

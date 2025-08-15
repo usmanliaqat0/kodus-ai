@@ -12,6 +12,7 @@ const prettierOptions = JSON.parse(readFileSync('./.prettierrc', 'utf8'));
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default tseslint.config(
+    tseslint.configs.strictTypeChecked,
     // Arquivos a ignorar
     {
         ignores: [
@@ -47,16 +48,8 @@ export default tseslint.config(
             // Integração com Prettier
             'prettier/prettier': ['error', prettierOptions],
 
-            // Regras básicas de tipagem
-            '@typescript-eslint/no-explicit-any': 'error',
+            '@typescript-eslint/prefer-nullish-coalescing':"error",
 
-            '@typescript-eslint/no-floating-promises': 'error',
-
-            // Regras básicas de tipagem
-            '@typescript-eslint/no-explicit-any': 'error',
-
-            // Desabilitar a regra que impede o uso de Function em decoradores
-            '@typescript-eslint/no-unsafe-function-type': 'off',
             '@typescript-eslint/no-unused-vars': [
                 'error',
                 { argsIgnorePattern: '^_' },
@@ -156,8 +149,6 @@ export default tseslint.config(
             'semi': 'off',
         },
     },
-    // Configurações recomendadas do TypeScript
-    tseslint.configs.recommended,
     // Configuração do Prettier (deve ser a última para sobrescrever regras conflitantes)
     prettierConfig,
 );

@@ -50,7 +50,7 @@ export class MCPRegistry {
                 });
 
                 // ─── 1. Normalizar tipo de transporte ───────────────────────────────
-                const transportType: TransportType = config.type ?? 'http';
+                const transportType: TransportType = config.type;
 
                 // ─── 2. Montar configuração p/ SpecCompliantMCPClient ───────────────
                 const clientConfig: MCPClientConfig = {
@@ -70,7 +70,7 @@ export class MCPRegistry {
                         sampling: {},
                         elicitation: {},
                     },
-                    allowedTools: config.allowedTools || [],
+                    allowedTools: config.allowedTools ?? [],
                 };
 
                 // ─── 3. Criar & conectar cliente ───────────────────────────────────
@@ -154,7 +154,7 @@ export class MCPRegistry {
 
                 for (const tool of tools) {
                     // ✅ ADDED: Validate tool structure before processing
-                    if (!tool || typeof tool !== 'object') {
+                    if (typeof tool !== 'object') {
                         this.logger.warn('Invalid tool structure received', {
                             serverName,
                             tool,
@@ -169,16 +169,6 @@ export class MCPRegistry {
                             tool,
                         });
                         continue;
-                    }
-
-                    // ✅ ADDED: Validate tool schema
-                    if (!tool.inputSchema) {
-                        this.logger.warn('Tool missing inputSchema', {
-                            serverName,
-                            toolName: tool.name,
-                        });
-                        // Use fallback schema
-                        tool.inputSchema = { type: 'object', properties: {} };
                     }
 
                     // ✅ ADDED: Log tool metadata for debugging
@@ -221,12 +211,12 @@ export class MCPRegistry {
 
         this.logger.info('Finished listing tools', {
             totalToolsFound: allTools.length,
-            toolsByServer: allTools.reduce(
+            toolsByServer: allTools.reduce<Record<string, number>>(
                 (acc, tool) => {
-                    acc[tool.serverName] = (acc[tool.serverName] || 0) + 1;
+                    acc[tool.serverName] = (acc[tool.serverName] ?? 0) + 1;
                     return acc;
                 },
-                {} as Record<string, number>,
+                {},
             ),
         });
 
@@ -257,7 +247,7 @@ export class MCPRegistry {
                 const tools = await client.listTools();
 
                 if (tools.some((tool) => tool.name === toolName)) {
-                    return client.executeTool(toolName, args);
+                    return await client.executeTool(toolName, args);
                 }
             } catch {
                 /* ignora */

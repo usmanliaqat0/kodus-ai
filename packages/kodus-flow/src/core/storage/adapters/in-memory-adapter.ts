@@ -32,9 +32,9 @@ export class InMemoryStorageAdapter<T extends BaseStorageItem>
     /**
      * Initialize the adapter
      */
-    async initialize(): Promise<void> {
+    initialize(): Promise<void> {
         if (this.isInitialized) {
-            return;
+            return Promise.resolve();
         }
 
         // Start cleanup interval
@@ -45,6 +45,8 @@ export class InMemoryStorageAdapter<T extends BaseStorageItem>
             maxItems: this.config.maxItems,
             enableCompression: this.config.enableCompression,
         });
+
+        return Promise.resolve();
     }
 
     /**
@@ -55,7 +57,7 @@ export class InMemoryStorageAdapter<T extends BaseStorageItem>
 
         // Check if we need to remove old items
         if (this.items.size >= this.config.maxItems) {
-            await this.removeOldestItems();
+            this.removeOldestItems();
         }
 
         this.items.set(item.id, item);
@@ -64,6 +66,8 @@ export class InMemoryStorageAdapter<T extends BaseStorageItem>
             id: item.id,
             totalItems: this.items.size,
         });
+
+        return Promise.resolve();
     }
 
     /**
@@ -74,7 +78,7 @@ export class InMemoryStorageAdapter<T extends BaseStorageItem>
 
         const item = this.items.get(id);
         if (!item) {
-            return null;
+            return Promise.resolve(null);
         }
 
         // Check if item has expired
@@ -84,10 +88,10 @@ export class InMemoryStorageAdapter<T extends BaseStorageItem>
             Date.now() > item.metadata.expireAt
         ) {
             await this.delete(id);
-            return null;
+            return Promise.resolve(null);
         }
 
-        return item;
+        return Promise.resolve(item);
     }
 
     /**
@@ -102,7 +106,7 @@ export class InMemoryStorageAdapter<T extends BaseStorageItem>
             logger.debug('Item deleted', { id });
         }
 
-        return deleted;
+        return Promise.resolve(deleted);
     }
 
     /**
@@ -113,6 +117,8 @@ export class InMemoryStorageAdapter<T extends BaseStorageItem>
 
         this.items.clear();
         logger.info('All items cleared');
+
+        return Promise.resolve();
     }
 
     /**
@@ -126,29 +132,30 @@ export class InMemoryStorageAdapter<T extends BaseStorageItem>
             return size + JSON.stringify(item).length;
         }, 0);
 
-        return {
+        return Promise.resolve({
             itemCount: this.items.size,
             totalSize,
             averageItemSize:
                 this.items.size > 0 ? totalSize / this.items.size : 0,
             adapterType: StorageType.INMEMORY,
-        };
+        });
     }
 
     /**
      * Check if adapter is healthy
      */
-    async isHealthy(): Promise<boolean> {
-        return this.isInitialized;
+    isHealthy(): Promise<boolean> {
+        return Promise.resolve(this.isInitialized);
     }
 
     /**
      * Cleanup resources
      */
-    async cleanup(): Promise<void> {
+    cleanup(): Promise<void> {
         this.items.clear();
         this.isInitialized = false;
         logger.info('InMemoryStorageAdapter cleaned up');
+        return Promise.resolve();
     }
 
     /**
@@ -158,6 +165,7 @@ export class InMemoryStorageAdapter<T extends BaseStorageItem>
         if (!this.isInitialized) {
             await this.initialize();
         }
+        return Promise.resolve();
     }
 
     /**
@@ -165,8 +173,8 @@ export class InMemoryStorageAdapter<T extends BaseStorageItem>
      */
     private startCleanupInterval(): void {
         if (this.config.cleanupInterval > 0) {
-            setInterval(async () => {
-                await this.cleanupExpiredItems();
+            setInterval(() => {
+                this.cleanupExpiredItems();
             }, this.config.cleanupInterval);
         }
     }
@@ -174,7 +182,7 @@ export class InMemoryStorageAdapter<T extends BaseStorageItem>
     /**
      * Remove oldest items when limit is reached
      */
-    private async removeOldestItems(): Promise<void> {
+    private removeOldestItems(): void {
         const items = Array.from(this.items.entries());
 
         // Sort by timestamp (oldest first)
@@ -196,7 +204,7 @@ export class InMemoryStorageAdapter<T extends BaseStorageItem>
     /**
      * Cleanup expired items
      */
-    private async cleanupExpiredItems(): Promise<void> {
+    private cleanupExpiredItems(): void {
         const now = Date.now();
         let expiredCount = 0;
 

@@ -132,7 +132,7 @@ export class StoragePersistorAdapter implements Persistor {
             getAllItems?: () => Map<string, BaseStorageItem>;
         };
         if (storageAny.getAllItems) {
-            for (const [id, item] of storageAny.getAllItems()!) {
+            for (const [id, item] of storageAny.getAllItems()) {
                 if (item.metadata && item.metadata['xcId'] === xcId) {
                     result.push(id);
                 }

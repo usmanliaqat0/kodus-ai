@@ -119,7 +119,7 @@ export class EnhancedContextBuilder {
 
     // ✅ ADD: Direct service references for better integration
     private memoryManager: MemoryManager;
-    private sessionService: SessionService;
+    private sessionService: SessionService<unknown>;
 
     // Context data for building
     private memoryData: Map<
@@ -194,7 +194,7 @@ export class EnhancedContextBuilder {
         key: string,
         value: unknown,
         metadata?: Record<string, unknown>,
-    ): EnhancedContextBuilder {
+    ): this {
         this.memoryData.set(key, { value, metadata, timestamp: Date.now() });
         return this;
     }
@@ -206,7 +206,7 @@ export class EnhancedContextBuilder {
         key: string,
         value: unknown,
         metadata?: Record<string, unknown>,
-    ): EnhancedContextBuilder {
+    ): this {
         this.sessionData.set(key, { value, metadata, timestamp: Date.now() });
         return this;
     }
@@ -219,11 +219,16 @@ export class EnhancedContextBuilder {
         key: string,
         value: unknown,
         metadata?: Record<string, unknown>,
-    ): EnhancedContextBuilder {
+    ): this {
         if (!this.stateData.has(namespace)) {
             this.stateData.set(namespace, new Map());
         }
-        const namespaceMap = this.stateData.get(namespace)!;
+        const namespaceMap = this.stateData.get(namespace);
+
+        if (!namespaceMap) {
+            throw new Error(`Namespace ${namespace} not found`);
+        }
+
         namespaceMap.set(key, { value, metadata, timestamp: Date.now() });
         return this;
     }
@@ -237,7 +242,7 @@ export class EnhancedContextBuilder {
             value: unknown;
             metadata?: Record<string, unknown>;
         }>,
-    ): EnhancedContextBuilder {
+    ): this {
         entries.forEach(({ key, value, metadata }) => {
             this.withMemory(key, value, metadata);
         });
@@ -253,7 +258,7 @@ export class EnhancedContextBuilder {
             value: unknown;
             metadata?: Record<string, unknown>;
         }>,
-    ): EnhancedContextBuilder {
+    ): this {
         entries.forEach(({ key, value, metadata }) => {
             this.withSession(key, value, metadata);
         });
@@ -270,7 +275,7 @@ export class EnhancedContextBuilder {
             value: unknown;
             metadata?: Record<string, unknown>;
         }>,
-    ): EnhancedContextBuilder {
+    ): this {
         entries.forEach(({ namespace, key, value, metadata }) => {
             this.withState(namespace, key, value, metadata);
         });
@@ -280,9 +285,7 @@ export class EnhancedContextBuilder {
     /**
      * Add user preferences to context
      */
-    withUserPreferences(
-        preferences: Record<string, unknown>,
-    ): EnhancedContextBuilder {
+    withUserPreferences(preferences: Record<string, unknown>): this {
         return this.withMemory('user-preferences', preferences, {
             type: 'preferences',
         });
@@ -291,7 +294,7 @@ export class EnhancedContextBuilder {
     /**
      * Add conversation history to context
      */
-    withConversationHistory(messages: unknown[]): EnhancedContextBuilder {
+    withConversationHistory(messages: unknown[]): this {
         return this.withSession('conversation-history', messages, {
             type: 'conversation',
         });
@@ -300,7 +303,7 @@ export class EnhancedContextBuilder {
     /**
      * Add current task state to context
      */
-    withCurrentTask(task: Record<string, unknown>): EnhancedContextBuilder {
+    withCurrentTask(task: Record<string, unknown>): this {
         return this.withState('current-task', 'status', task, {
             type: 'task-state',
         });
@@ -309,17 +312,11 @@ export class EnhancedContextBuilder {
     /**
      * Add relevant memories based on query
      */
-    async withRelevantMemories(
-        query: string,
-        limit?: number,
-    ): Promise<EnhancedContextBuilder> {
+    wthRelevantMemories(query: string, limit?: number): this {
         try {
             const maxItems =
-                limit || this.config.retrieval?.maxRelevantItems || 5;
-            const relevantMemories = await this.findRelevantMemories(
-                query,
-                maxItems,
-            );
+                limit ?? this.config.retrieval?.maxRelevantItems ?? 5;
+            const relevantMemories = this.findRelevantMemories(query, maxItems);
             return this.withMemory('relevant-memories', relevantMemories, {
                 type: 'retrieved',
                 query,
@@ -336,16 +333,14 @@ export class EnhancedContextBuilder {
     /**
      * Add execution hints to context
      */
-    withExecutionHints(hints: Record<string, unknown>): EnhancedContextBuilder {
+    withExecutionHints(hints: Record<string, unknown>): this {
         return this.withMemory('execution-hints', hints, { type: 'hints' });
     }
 
     /**
      * Add learning context to context
      */
-    withLearningContext(
-        learning: Record<string, unknown>,
-    ): EnhancedContextBuilder {
+    withLearningContext(learning: Record<string, unknown>): this {
         return this.withMemory('learning-context', learning, {
             type: 'learning',
         });
@@ -440,7 +435,7 @@ export class EnhancedContextBuilder {
 
                 for (const result of memoryResults) {
                     this.memoryData.set(result.id, {
-                        value: result.text || result.id,
+                        value: result.text ?? result.id,
                         metadata: result.metadata,
                         timestamp: result.timestamp,
                     });
@@ -579,16 +574,16 @@ export class EnhancedContextBuilder {
             // Query memory
             if (!query.layers || query.layers.includes('memory')) {
                 const searchLimit =
-                    query.limit ||
-                    this.config.retrieval?.maxRelevantItems ||
+                    query.limit ??
+                    this.config.retrieval?.maxRelevantItems ??
                     10;
                 const memoryResults = await agentContext.memory.search(
-                    query.text || '',
+                    query.text ?? '',
                     searchLimit,
                 );
                 results.push(
                     ...memoryResults.map((item, index) => ({
-                        key: `memory-${index}`,
+                        key: `memory-${index.toString()}`,
                         value: item,
                         layer: 'memory' as ContextLayer,
                         timestamp: Date.now(),
@@ -611,11 +606,11 @@ export class EnhancedContextBuilder {
                         }
                         return true;
                     })
-                    .slice(0, query.limit || 10);
+                    .slice(0, query.limit ?? 10);
 
                 results.push(
                     ...relevantSessions.map((entry, index) => ({
-                        key: `session-${index}`,
+                        key: `session-${index.toString()}`,
                         value: entry,
                         layer: 'session' as ContextLayer,
                         timestamp: Date.now(),
@@ -646,7 +641,7 @@ export class EnhancedContextBuilder {
         agentContext: AgentContext,
         layers?: ContextLayer[],
     ): Promise<void> {
-        const layersToClear = layers || ['memory', 'session', 'state'];
+        const layersToClear = layers ?? ['memory', 'session', 'state'];
 
         try {
             if (layersToClear.includes('memory')) {
@@ -678,10 +673,7 @@ export class EnhancedContextBuilder {
     /**
      * Find relevant memories based on query
      */
-    private async findRelevantMemories(
-        query: string,
-        limit: number,
-    ): Promise<unknown[]> {
+    private findRelevantMemories(query: string, limit: number): unknown[] {
         try {
             // TODO: Integrate with MemoryManager search functionality
             // For now, return empty array as placeholder

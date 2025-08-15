@@ -60,7 +60,7 @@ export function withValidateMiddleware(
         handler: EventHandler<E>,
     ): EventHandler<E> {
         return withValidate(schema, handler, options);
-    } as Middleware<Event>;
+    } as Middleware;
 
     middleware.kind = 'handler';
     (middleware as unknown as { displayName?: string }).displayName =

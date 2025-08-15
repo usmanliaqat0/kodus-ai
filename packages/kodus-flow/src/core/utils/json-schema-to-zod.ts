@@ -16,7 +16,7 @@ import { z } from 'zod';
  * Suporta tipos básicos: string, number, boolean, object, array
  * + tipos avançados: file, uri, email, etc.
  */
-export function jsonSchemaToZod(jsonSchema: unknown): z.ZodSchema {
+export function jsonSchemaToZod(jsonSchema: unknown): z.ZodType {
     if (!jsonSchema || typeof jsonSchema !== 'object') {
         return z.any();
     }
@@ -26,9 +26,9 @@ export function jsonSchemaToZod(jsonSchema: unknown): z.ZodSchema {
     // Se é um objeto com properties, é um object schema
     if (schema.properties && typeof schema.properties === 'object') {
         const properties = schema.properties as Record<string, unknown>;
-        const required = (schema.required as string[]) || [];
+        const required = (schema.required as string[] | undefined) ?? [];
 
-        const shape: Record<string, z.ZodSchema> = {};
+        const shape: Record<string, z.ZodType> = {};
 
         for (const [key, propSchema] of Object.entries(properties)) {
             const zodProp = jsonSchemaPropertyToZod(propSchema);
@@ -56,7 +56,7 @@ export function jsonSchemaToZod(jsonSchema: unknown): z.ZodSchema {
 /**
  * Converte uma propriedade JSON Schema para Zod
  */
-function jsonSchemaPropertyToZod(propSchema: unknown): z.ZodSchema {
+function jsonSchemaPropertyToZod(propSchema: unknown): z.ZodType {
     if (!propSchema || typeof propSchema !== 'object') {
         return z.any();
     }
@@ -69,7 +69,7 @@ function jsonSchemaPropertyToZod(propSchema: unknown): z.ZodSchema {
 
         // ✅ ADDED: Preserve description
         if (schema.description && typeof schema.description === 'string') {
-            return zodSchema.describe(schema.description as string);
+            return zodSchema.describe(schema.description);
         }
 
         return zodSchema;
@@ -78,13 +78,13 @@ function jsonSchemaPropertyToZod(propSchema: unknown): z.ZodSchema {
     // Se tem enum, é um enum
     if (schema.enum && Array.isArray(schema.enum)) {
         const enumValues = schema.enum as unknown[];
-        let enumSchema: z.ZodSchema;
+        let enumSchema: z.ZodType;
 
         if (enumValues.every((v) => typeof v === 'string')) {
             enumSchema = z.enum(enumValues as [string, ...string[]]);
         } else if (enumValues.every((v) => typeof v === 'number')) {
             // Para enums numéricos, usamos union de literals
-            const numberLiterals = enumValues as number[];
+            const numberLiterals = enumValues;
             enumSchema = z.union(
                 numberLiterals.map((n) => z.literal(n)) as [
                     z.ZodLiteral<number>,
@@ -97,7 +97,7 @@ function jsonSchemaPropertyToZod(propSchema: unknown): z.ZodSchema {
 
         // ✅ ADDED: Preserve description
         if (schema.description && typeof schema.description === 'string') {
-            return enumSchema.describe(schema.description as string);
+            return enumSchema.describe(schema.description);
         }
 
         return enumSchema;
@@ -108,12 +108,12 @@ function jsonSchemaPropertyToZod(propSchema: unknown): z.ZodSchema {
         const options = (schema.oneOf as unknown[]).map(jsonSchemaToZod);
         if (options.length >= 2) {
             const unionSchema = z.union(
-                options as [z.ZodSchema, z.ZodSchema, ...z.ZodSchema[]],
+                options as [z.ZodType, z.ZodType, ...z.ZodType[]],
             );
 
             // ✅ ADDED: Preserve description
             if (schema.description && typeof schema.description === 'string') {
-                return unionSchema.describe(schema.description as string);
+                return unionSchema.describe(schema.description);
             }
 
             return unionSchema;
@@ -124,12 +124,12 @@ function jsonSchemaPropertyToZod(propSchema: unknown): z.ZodSchema {
         const options = (schema.anyOf as unknown[]).map(jsonSchemaToZod);
         if (options.length >= 2) {
             const unionSchema = z.union(
-                options as [z.ZodSchema, z.ZodSchema, ...z.ZodSchema[]],
+                options as [z.ZodType, z.ZodType, ...z.ZodType[]],
             );
 
             // ✅ ADDED: Preserve description
             if (schema.description && typeof schema.description === 'string') {
-                return unionSchema.describe(schema.description as string);
+                return unionSchema.describe(schema.description);
             }
 
             return unionSchema;
@@ -141,7 +141,7 @@ function jsonSchemaPropertyToZod(propSchema: unknown): z.ZodSchema {
 
     // ✅ ADDED: Preserve description
     if (schema.description && typeof schema.description === 'string') {
-        return fallbackSchema.describe(schema.description as string);
+        return fallbackSchema.describe(schema.description);
     }
 
     return fallbackSchema;
@@ -150,9 +150,9 @@ function jsonSchemaPropertyToZod(propSchema: unknown): z.ZodSchema {
 /**
  * Converte um tipo JSON Schema para Zod
  */
-function jsonSchemaTypeToZod(schema: Record<string, unknown>): z.ZodSchema {
+function jsonSchemaTypeToZod(schema: Record<string, unknown>): z.ZodType {
     const type = schema.type as string;
-    let zodSchema: z.ZodSchema;
+    let zodSchema: z.ZodType;
 
     switch (type) {
         case 'string':
@@ -170,37 +170,33 @@ function jsonSchemaTypeToZod(schema: Record<string, unknown>): z.ZodSchema {
 
             // Adiciona constraints se existirem
             if (schema.minLength && typeof schema.minLength === 'number') {
-                zodSchema = (zodSchema as z.ZodString).min(
-                    schema.minLength as number,
-                );
+                zodSchema = (zodSchema as z.ZodString).min(schema.minLength);
             }
             if (schema.maxLength && typeof schema.maxLength === 'number') {
-                zodSchema = (zodSchema as z.ZodString).max(
-                    schema.maxLength as number,
-                );
+                zodSchema = (zodSchema as z.ZodString).max(schema.maxLength);
             }
             if (schema.pattern && typeof schema.pattern === 'string') {
                 zodSchema = (zodSchema as z.ZodString).regex(
-                    new RegExp(schema.pattern as string),
+                    new RegExp(schema.pattern),
                 );
             }
 
             // Suporte a formatos específicos do MCP
             if (schema.format && typeof schema.format === 'string') {
-                const format = schema.format as string;
+                const format = schema.format;
                 switch (format) {
                     case 'uri':
                     case 'uri-reference':
-                        zodSchema = (zodSchema as z.ZodString).url();
+                        zodSchema = z.url();
                         break;
                     case 'email':
-                        zodSchema = (zodSchema as z.ZodString).email();
+                        zodSchema = z.email();
                         break;
                     case 'date-time':
-                        zodSchema = (zodSchema as z.ZodString).datetime();
+                        zodSchema = z.iso.datetime();
                         break;
                     case 'date':
-                        zodSchema = (zodSchema as z.ZodString).date();
+                        zodSchema = z.date();
                         break;
                     case 'time':
                         zodSchema = (zodSchema as z.ZodString).regex(
@@ -208,7 +204,7 @@ function jsonSchemaTypeToZod(schema: Record<string, unknown>): z.ZodSchema {
                         );
                         break;
                     case 'uuid':
-                        zodSchema = (zodSchema as z.ZodString).uuid();
+                        zodSchema = z.uuid();
                         break;
                     case 'ipv4':
                         zodSchema = (zodSchema as z.ZodString).regex(
@@ -234,22 +230,20 @@ function jsonSchemaTypeToZod(schema: Record<string, unknown>): z.ZodSchema {
                 schema.minimum !== undefined &&
                 typeof schema.minimum === 'number'
             ) {
-                zodSchema = (zodSchema as z.ZodNumber).min(
-                    schema.minimum as number,
-                );
+                zodSchema = (zodSchema as z.ZodNumber).min(schema.minimum);
             }
             if (
                 schema.maximum !== undefined &&
                 typeof schema.maximum === 'number'
             ) {
-                zodSchema = (zodSchema as z.ZodNumber).max(
-                    schema.maximum as number,
-                );
+                zodSchema = (zodSchema as z.ZodNumber).max(schema.maximum);
             }
             if (schema.multipleOf && typeof schema.multipleOf === 'number') {
                 zodSchema = (zodSchema as z.ZodNumber).refine(
                     (val: number) => val % (schema.multipleOf as number) === 0,
-                    { message: `Must be multiple of ${schema.multipleOf}` },
+                    {
+                        message: `Must be multiple of ${schema.multipleOf.toString()}`,
+                    },
                 );
             }
 
@@ -266,17 +260,17 @@ function jsonSchemaTypeToZod(schema: Record<string, unknown>): z.ZodSchema {
 
                 // Adiciona constraints de array
                 if (schema.minItems && typeof schema.minItems === 'number') {
-                    zodSchema = (zodSchema as z.ZodArray<z.ZodTypeAny>).min(
-                        schema.minItems as number,
+                    zodSchema = (zodSchema as z.ZodArray<z.ZodType>).min(
+                        schema.minItems,
                     );
                 }
                 if (schema.maxItems && typeof schema.maxItems === 'number') {
-                    zodSchema = (zodSchema as z.ZodArray<z.ZodTypeAny>).max(
-                        schema.maxItems as number,
+                    zodSchema = (zodSchema as z.ZodArray<z.ZodType>).max(
+                        schema.maxItems,
                     );
                 }
                 if (schema.uniqueItems === true) {
-                    zodSchema = (zodSchema as z.ZodArray<z.ZodTypeAny>).refine(
+                    zodSchema = (zodSchema as z.ZodArray<z.ZodType>).refine(
                         (arr: unknown[]) => new Set(arr).size === arr.length,
                         { message: 'Array items must be unique' },
                     );
@@ -304,7 +298,7 @@ function jsonSchemaTypeToZod(schema: Record<string, unknown>): z.ZodSchema {
 
     // ✅ ADDED: Preserve description
     if (schema.description && typeof schema.description === 'string') {
-        return zodSchema.describe(schema.description as string);
+        return zodSchema.describe(schema.description);
     }
 
     return zodSchema;
@@ -313,7 +307,7 @@ function jsonSchemaTypeToZod(schema: Record<string, unknown>): z.ZodSchema {
 /**
  * Converte JSON Schema para Zod com fallback seguro
  */
-export function safeJsonSchemaToZod(jsonSchema: unknown): z.ZodSchema {
+export function safeJsonSchemaToZod(jsonSchema: unknown): z.ZodType {
     try {
         return jsonSchemaToZod(jsonSchema);
     } catch {
@@ -321,14 +315,15 @@ export function safeJsonSchemaToZod(jsonSchema: unknown): z.ZodSchema {
             const schema = jsonSchema as Record<string, unknown>;
             if (schema.properties && typeof schema.properties === 'object') {
                 const properties = schema.properties as Record<string, unknown>;
-                const required = (schema.required as string[]) || [];
+                const required =
+                    (schema.required as string[] | undefined) ?? [];
 
-                const shape: Record<string, z.ZodSchema> = {};
+                const shape: Record<string, z.ZodType> = {};
                 for (const [key, prop] of Object.entries(properties)) {
                     const propSchema = prop as Record<string, unknown>;
 
                     // ✅ IMPROVED: Better type detection
-                    let zodProp: z.ZodSchema;
+                    let zodProp: z.ZodType;
                     if (propSchema.type === 'string') {
                         zodProp = z.string();
                     } else if (
@@ -373,14 +368,14 @@ export function isValidJsonSchema(schema: unknown): boolean {
     const s = schema as Record<string, unknown>;
 
     // Deve ter pelo menos type ou properties
-    return !!(s.type || s.properties);
+    return !!(s.type ?? s.properties);
 }
 
 /**
  * Converte Zod schema para JSON Schema (para compatibilidade reversa)
  */
 export function zodToJsonSchema(
-    _zodSchema: z.ZodSchema,
+    _zodSchema: z.ZodType,
 ): Record<string, unknown> {
     // Implementação básica - pode ser expandida
     return {

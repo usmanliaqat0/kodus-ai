@@ -37,22 +37,22 @@ async function demonstrateConnectionRecovery() {
         // Primeira chamada - deve funcionar
         console.log('📋 Listando tools pela primeira vez...');
         const tools1 = await mcpAdapter.getTools();
-        console.log(`✅ Encontradas ${tools1.length} tools`);
+        console.log(`✅ Encontradas ${tools1.length.toString()} tools`);
 
         // Segunda chamada - deve funcionar mesmo se conexão foi perdida
         console.log('📋 Listando tools pela segunda vez...');
         const tools2 = await mcpAdapter.getTools();
-        console.log(`✅ Encontradas ${tools2.length} tools`);
+        console.log(`✅ Encontradas ${tools2.length.toString()} tools`);
 
         // Terceira chamada - deve funcionar
         console.log('📋 Listando tools pela terceira vez...');
         const tools3 = await mcpAdapter.getTools();
-        console.log(`✅ Encontradas ${tools3.length} tools`);
+        console.log(`✅ Encontradas ${tools3.length.toString()} tools`);
 
         // Verificar se tool existe
         console.log('🔍 Verificando se tool existe...');
         const hasTool = await mcpAdapter.hasTool('read_file');
-        console.log(`✅ Tool existe: ${hasTool}`);
+        console.log(`✅ Tool existe: ${hasTool.toString()}`);
 
         // Executar tool
         if (hasTool) {
@@ -67,13 +67,13 @@ async function demonstrateConnectionRecovery() {
     } finally {
         // Sempre desconectar
         console.log('🔌 Desconectando...');
-        await mcpAdapter.disconnect();
+        mcpAdapter.disconnect();
         console.log('✅ Desconectado!');
     }
 }
 
-// Executar demonstração
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Executar demonstração.toString()
+if (import.meta.url === `file://${process.argv[1] ?? ''}`) {
     demonstrateConnectionRecovery().catch(console.error);
 }
 

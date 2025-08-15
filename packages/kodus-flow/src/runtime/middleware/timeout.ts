@@ -38,10 +38,9 @@ export interface TimeoutOptions {
  * }, { timeoutMs: 5000 }));
  * ```
  */
-export const withTimeout: MiddlewareFactoryType<
-    TimeoutOptions | undefined,
-    Event
-> = (options: TimeoutOptions | undefined) => {
+export const withTimeout: MiddlewareFactoryType<TimeoutOptions | undefined> = (
+    options: TimeoutOptions | undefined,
+) => {
     const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
     const middleware = (<T extends Event>(
@@ -71,7 +70,7 @@ export const withTimeout: MiddlewareFactoryType<
         };
 
         return withTimeoutWrapped;
-    }) as Middleware<Event>;
+    }) as Middleware;
 
     middleware.kind = 'pipeline';
     (middleware as unknown as { displayName?: string }).displayName =

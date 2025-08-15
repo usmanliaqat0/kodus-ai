@@ -218,7 +218,7 @@ export class DirectLLMAdapter implements LLMAdapter {
         this.initializeRoutingStrategies(); // 🔄 Keep for legacy fallback
 
         this.logger.info('Direct LLM adapter initialized (SIMPLIFIED)', {
-            llmName: langchainLLM.name || 'unknown-llm',
+            llmName: langchainLLM.name ?? 'unknown-llm',
             hasStreaming: typeof langchainLLM.stream === 'function',
         });
     }
@@ -269,9 +269,9 @@ export class DirectLLMAdapter implements LLMAdapter {
         }
 
         const systemPrompt =
-            context?.systemPrompt ||
+            context?.systemPrompt ??
             `You are an AI assistant using the ${technique} planning technique.`;
-        const userPrompt = context?.userPrompt || `Goal: ${goal}`;
+        const userPrompt = context?.userPrompt ?? `Goal: ${goal}`;
 
         const messages: LangChainMessage[] = [
             {
@@ -286,7 +286,7 @@ export class DirectLLMAdapter implements LLMAdapter {
 
         try {
             const span = startLLMSpan(obs.telemetry, {
-                model: this.llm.name || 'unknown',
+                model: this.llm.name ?? 'unknown',
                 technique,
                 temperature: options.temperature,
                 topP: options.topP,
@@ -297,21 +297,21 @@ export class DirectLLMAdapter implements LLMAdapter {
                 try {
                     const res = await this.llm.call(messages, options);
                     // Record usage if present
-                    if (typeof res !== 'string' && res?.usage) {
+                    if (typeof res !== 'string' && res.usage) {
                         const usage = res.usage;
-                        if (usage?.totalTokens !== undefined) {
+                        if (usage.totalTokens !== undefined) {
                             span.setAttribute(
                                 'gen_ai.usage.total_tokens',
                                 usage.totalTokens,
                             );
                         }
-                        if (usage?.promptTokens !== undefined) {
+                        if (usage.promptTokens !== undefined) {
                             span.setAttribute(
                                 'gen_ai.usage.input_tokens',
                                 usage.promptTokens,
                             );
                         }
-                        if (usage?.completionTokens !== undefined) {
+                        if (usage.completionTokens !== undefined) {
                             span.setAttribute(
                                 'gen_ai.usage.output_tokens',
                                 usage.completionTokens,
@@ -322,7 +322,7 @@ export class DirectLLMAdapter implements LLMAdapter {
                     return res;
                 } catch (err) {
                     applyErrorToSpan(span, err, {
-                        model: this.llm.name || 'unknown',
+                        model: this.llm.name ?? 'unknown',
                     });
                     throw err;
                 }
@@ -358,7 +358,7 @@ export class DirectLLMAdapter implements LLMAdapter {
         let systemPrompt: string;
         let userPrompt: string;
 
-        if (context?.systemPrompt && context?.userPrompt) {
+        if (context?.systemPrompt && context.userPrompt) {
             systemPrompt = context.systemPrompt;
             userPrompt = context.userPrompt;
 
@@ -368,7 +368,7 @@ export class DirectLLMAdapter implements LLMAdapter {
             });
         } else {
             // 🔄 FALLBACK: Use legacy routing strategy
-            const strategy = context?.strategy || 'llm_decision';
+            const strategy = context?.strategy ?? 'llm_decision';
             const routingStrategy = this.routingStrategies.get(strategy);
 
             if (!routingStrategy) {
@@ -380,7 +380,10 @@ export class DirectLLMAdapter implements LLMAdapter {
 
             systemPrompt = routingStrategy.systemPrompt;
             userPrompt = routingStrategy.userPromptTemplate
-                .replace('{input}', String(input))
+                .replace(
+                    '{input}',
+                    typeof input === 'string' ? input : JSON.stringify(input),
+                )
                 .replace('{availableTools}', availableTools.join(', '));
 
             this.logger.warn('Using legacy routing strategy', { strategy });
@@ -401,14 +404,14 @@ export class DirectLLMAdapter implements LLMAdapter {
             const obs = getObservability();
             // Definimos options antes de ler seus campos
             const options =
-                context?.systemPrompt && context?.userPrompt
+                context?.systemPrompt && context.userPrompt
                     ? DEFAULT_LLM_SETTINGS
-                    : this.routingStrategies.get(
-                          context?.strategy || 'llm_decision',
-                      )?.options || DEFAULT_LLM_SETTINGS;
+                    : (this.routingStrategies.get(
+                          context?.strategy ?? 'llm_decision',
+                      )?.options ?? DEFAULT_LLM_SETTINGS);
 
             const span = startLLMSpan(obs.telemetry, {
-                model: this.llm.name || 'unknown',
+                model: this.llm.name ?? 'unknown',
                 technique: 'route',
                 temperature: (options as LangChainOptions).temperature,
                 topP: (options as LangChainOptions).topP,
@@ -416,7 +419,7 @@ export class DirectLLMAdapter implements LLMAdapter {
             });
             this.logger.debug('Routing with LangChain LLM', {
                 hasReadyPrompts: !!(
-                    context?.systemPrompt && context?.userPrompt
+                    context?.systemPrompt && context.userPrompt
                 ),
                 input:
                     typeof input === 'object' ? JSON.stringify(input) : input,
@@ -428,21 +431,21 @@ export class DirectLLMAdapter implements LLMAdapter {
             const response = await obs.telemetry.withSpan(span, async () => {
                 try {
                     const res = await this.llm.call(messages, options);
-                    if (typeof res !== 'string' && res?.usage) {
+                    if (typeof res !== 'string' && res.usage) {
                         const usage = res.usage;
-                        if (usage?.totalTokens !== undefined) {
+                        if (usage.totalTokens !== undefined) {
                             span.setAttribute(
                                 'gen_ai.usage.total_tokens',
                                 usage.totalTokens,
                             );
                         }
-                        if (usage?.promptTokens !== undefined) {
+                        if (usage.promptTokens !== undefined) {
                             span.setAttribute(
                                 'gen_ai.usage.input_tokens',
                                 usage.promptTokens,
                             );
                         }
-                        if (usage?.completionTokens !== undefined) {
+                        if (usage.completionTokens !== undefined) {
                             span.setAttribute(
                                 'gen_ai.usage.output_tokens',
                                 usage.completionTokens,
@@ -453,7 +456,7 @@ export class DirectLLMAdapter implements LLMAdapter {
                     return res;
                 } catch (err) {
                     applyErrorToSpan(span, err, {
-                        model: this.llm.name || 'unknown',
+                        model: this.llm.name ?? 'unknown',
                     });
                     throw err;
                 }
@@ -606,10 +609,13 @@ Please analyze semantic similarity and select the most appropriate tool.`,
                 toolCallsCount: llmValidated.toolCalls.length,
             });
 
-            extractedSteps = llmValidated?.toolCalls?.map((call, index) => {
+            extractedSteps = llmValidated.toolCalls.map((call, index) => {
                 let parsedArgs: Record<string, unknown> = {};
                 try {
-                    parsedArgs = JSON.parse(call.function.arguments);
+                    parsedArgs = JSON.parse(call.function.arguments) as Record<
+                        string,
+                        unknown
+                    >;
                 } catch (error) {
                     this.logger.warn('Failed to parse tool call arguments', {
                         toolName: call.function.name,
@@ -619,11 +625,11 @@ Please analyze semantic similarity and select the most appropriate tool.`,
                 }
 
                 return {
-                    id: call.id || `step-${index + 1}`,
+                    id: call.id || `step-${(index + 1).toString()}`,
                     description: `Execute ${call.function.name}`,
                     tool: call.function.name,
                     arguments: parsedArgs,
-                    dependencies: index > 0 ? [`step-${index}`] : [],
+                    dependencies: index > 0 ? [`step-${index.toString()}`] : [],
                     type: 'action' as const,
                 };
             });
@@ -637,10 +643,10 @@ Please analyze semantic similarity and select the most appropriate tool.`,
             });
 
             const validated = validatePlanningResponse(response);
-            extractedSteps = validated.steps || [];
+            extractedSteps = validated.steps;
             extractedReasoning = validated.reasoning || '';
-            extractedSignals = validated.signals || {};
-            extractedAudit = validated.audit || [];
+            extractedSignals = validated.signals ?? {};
+            extractedAudit = validated.audit ?? [];
         }
 
         return {
@@ -662,13 +668,13 @@ Please analyze semantic similarity and select the most appropriate tool.`,
         const content = validated.content;
 
         try {
-            const parsed = JSON.parse(content);
+            const parsed = JSON.parse(content) as Partial<RoutingResult>;
             return {
-                strategy: parsed.strategy || 'llm_decision',
-                selectedTool: parsed.selectedTool || 'unknown',
-                confidence: parsed.confidence || 0.5,
-                reasoning: parsed.reasoning || 'LLM routing response',
-                alternatives: parsed.alternatives || [],
+                strategy: parsed.strategy ?? 'llm_decision',
+                selectedTool: parsed.selectedTool ?? 'unknown',
+                confidence: parsed.confidence ?? 0.5,
+                reasoning: parsed.reasoning ?? 'LLM routing response',
+                alternatives: parsed.alternatives ?? [],
             };
         } catch {
             return {
@@ -686,7 +692,7 @@ Please analyze semantic similarity and select the most appropriate tool.`,
     }
 
     getName(): string {
-        return this.llm.name || 'unknown-llm';
+        return this.llm.name ?? 'unknown-llm';
     }
 
     // ✅ COMPATIBILITY: LLMAdapter interface compliance
@@ -710,27 +716,27 @@ Please analyze semantic similarity and select the most appropriate tool.`,
 
         try {
             const span = startLLMSpan(obs.telemetry, {
-                model: this.llm.name || 'unknown',
+                model: this.llm.name ?? 'unknown',
                 temperature: options.temperature,
                 maxTokens: options.maxTokens,
             });
             const response = await obs.telemetry.withSpan(span, async () => {
                 const res = await this.llm.call(messages, options);
-                if (typeof res !== 'string' && res?.usage) {
+                if (typeof res !== 'string' && res.usage) {
                     const usage = res.usage;
-                    if (usage?.totalTokens !== undefined) {
+                    if (usage.totalTokens !== undefined) {
                         span.setAttribute(
                             'gen_ai.usage.total_tokens',
                             usage.totalTokens,
                         );
                     }
-                    if (usage?.promptTokens !== undefined) {
+                    if (usage.promptTokens !== undefined) {
                         span.setAttribute(
                             'gen_ai.usage.input_tokens',
                             usage.promptTokens,
                         );
                     }
-                    if (usage?.completionTokens !== undefined) {
+                    if (usage.completionTokens !== undefined) {
                         span.setAttribute(
                             'gen_ai.usage.output_tokens',
                             usage.completionTokens,

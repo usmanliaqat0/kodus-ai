@@ -127,7 +127,7 @@ export abstract class BaseSDKError<
     public readonly timestamp: number;
 
     constructor(options: SDKErrorOptions<T>) {
-        super(options.message || `${options.code}`);
+        super(options.message || options.code);
         this.code = options.code;
         this.cause = options.cause;
         this.context = options.context;

@@ -253,10 +253,9 @@ export class DefaultResourceManager implements ResourceManager {
                 if (result instanceof Promise) {
                     // CRÍTICO: Timeout para evitar cleanup callbacks pendentes
                     const timeoutPromise = new Promise<void>((_, reject) => {
-                        setTimeout(
-                            () => reject(new Error('Cleanup timeout')),
-                            CLEANUP_TIMEOUT,
-                        );
+                        setTimeout(() => {
+                            reject(new Error('Cleanup timeout'));
+                        }, CLEANUP_TIMEOUT);
                     });
 
                     cleanupPromises.push(

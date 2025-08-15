@@ -13,7 +13,7 @@ import type {
     BaseStorageStats,
 } from '../../types/base-storage.js';
 import type { StorageAdapterConfig } from '../factory.js';
-import type { MongoClient, Db, Collection } from 'mongodb';
+import { MongoClient, Db, Collection } from 'mongodb';
 
 const logger = createLogger('mongodb-storage-adapter');
 
@@ -37,29 +37,43 @@ export class MongoDBStorageAdapter<T extends BaseStorageItem>
         if (this.isInitialized) return;
 
         try {
-            // Dynamic import to avoid requiring mongodb in package.json
-            const { MongoClient: mongoClient } = await import('mongodb');
-
             const connectionString =
-                this.config.connectionString ||
+                this.config.connectionString ??
                 'mongodb://localhost:27017/kodus';
-            const options = this.config.options || {};
+            const options = this.config.options ?? {};
 
-            this.client = new mongoClient(connectionString, {
-                maxPoolSize: (options.maxPoolSize as number) ?? 10,
-                serverSelectionTimeoutMS:
-                    (options.serverSelectionTimeoutMS as number) ?? 5000,
-                connectTimeoutMS: (options.connectTimeoutMS as number) ?? 10000,
-                socketTimeoutMS: (options.socketTimeoutMS as number) ?? 45000,
+            const maxPoolSize =
+                typeof options.maxPoolSize === 'number'
+                    ? options.maxPoolSize
+                    : 10;
+            const serverSelectionTimeoutMS =
+                typeof options.serverSelectionTimeoutMS === 'number'
+                    ? options.serverSelectionTimeoutMS
+                    : 5000;
+            const connectTimeoutMS =
+                typeof options.connectTimeoutMS === 'number'
+                    ? options.connectTimeoutMS
+                    : 10000;
+            const socketTimeoutMS =
+                typeof options.socketTimeoutMS === 'number'
+                    ? options.socketTimeoutMS
+                    : 45000;
+
+            this.client = new MongoClient(connectionString, {
+                maxPoolSize,
+                serverSelectionTimeoutMS,
+                connectTimeoutMS,
+                socketTimeoutMS,
             });
 
             await this.client.connect();
 
-            const database = (options.database as string) ?? 'kodus';
+            const database =
+                (options.database as string | undefined) ?? 'kodus';
 
             // ✅ NOVO: Determinar collection baseado no tipo de dados
             const defaultCollection =
-                (options.collection as string) ?? 'storage';
+                (options.collection as string | undefined) ?? 'storage';
             const dataType = this.determineDataType();
             const collection = this.getCollectionName(
                 defaultCollection,
@@ -93,7 +107,7 @@ export class MongoDBStorageAdapter<T extends BaseStorageItem>
                         options?: unknown,
                     ) => Promise<unknown>;
                 }
-            ).createIndex({ [String('metadata.xcId')]: 1 } as {
+            ).createIndex({ ['metadata.xcId']: 1 } as {
                 [key: string]: number;
             });
 
@@ -197,7 +211,7 @@ export class MongoDBStorageAdapter<T extends BaseStorageItem>
         await this.ensureInitialized();
 
         try {
-            const document = await this.collection!.findOne({ id });
+            const document = await this.collection?.findOne({ id });
 
             if (!document) {
                 return null;
@@ -222,15 +236,15 @@ export class MongoDBStorageAdapter<T extends BaseStorageItem>
         await this.ensureInitialized();
 
         try {
-            const result = await this.collection!.deleteOne({ id });
+            const result = await this.collection?.deleteOne({ id });
 
             logger.debug('Item deleted from MongoDB', {
                 id,
-                deletedCount: result.deletedCount,
+                deletedCount: result?.deletedCount ?? 0,
                 collection: this.collection?.collectionName,
             });
 
-            return result.deletedCount > 0;
+            return (result?.deletedCount ?? 0) > 0;
         } catch (error) {
             logger.error('Failed to delete item from MongoDB', error as Error, {
                 id,
@@ -244,7 +258,7 @@ export class MongoDBStorageAdapter<T extends BaseStorageItem>
         await this.ensureInitialized();
 
         try {
-            await this.collection!.deleteMany({});
+            await this.collection?.deleteMany({});
 
             logger.info('Collection cleared', {
                 collection: this.collection?.collectionName,
@@ -261,23 +275,27 @@ export class MongoDBStorageAdapter<T extends BaseStorageItem>
         await this.ensureInitialized();
 
         try {
-            const count = await this.collection!.countDocuments();
-            const stats = await this.collection!.aggregate([
-                {
-                    $group: {
-                        _id: null, // eslint-disable-line @typescript-eslint/naming-convention
-                        totalSize: { $sum: { $bsonSize: '$$ROOT' } },
-                        avgSize: { $avg: { $bsonSize: '$$ROOT' } },
+            const count = await this.collection?.countDocuments();
+            const stats = await this.collection
+                ?.aggregate([
+                    {
+                        $group: {
+                            _id: null, // eslint-disable-line @typescript-eslint/naming-convention
+                            totalSize: { $sum: { $bsonSize: '$$ROOT' } },
+                            avgSize: { $avg: { $bsonSize: '$$ROOT' } },
+                        },
                     },
-                },
-            ]).toArray();
+                ])
+                .toArray();
 
-            const result = stats[0] || { totalSize: 0, avgSize: 0 };
+            const result = stats?.[0] ?? { totalSize: 0, avgSize: 0 };
 
             return {
-                itemCount: count,
-                totalSize: result.totalSize,
-                averageItemSize: Math.round(result.avgSize),
+                itemCount: count ?? 0,
+                totalSize: (result.totalSize as number | undefined) ?? 0,
+                averageItemSize: Math.round(
+                    (result.avgSize as number | undefined) ?? 0,
+                ),
                 adapterType: 'mongodb',
             };
         } catch (error) {
@@ -332,10 +350,15 @@ export class MongoDBStorageAdapter<T extends BaseStorageItem>
     async findOneByQuery(query: Record<string, unknown>): Promise<T | null> {
         await this.ensureInitialized();
         try {
-            const doc = await this.collection!.findOne(
+            const doc = await this.collection?.findOne(
                 query as unknown as object,
             );
-            return (doc as unknown as T) || null;
+
+            if (!doc) {
+                return null;
+            }
+
+            return doc as unknown as T;
         } catch (error) {
             logger.error('Failed to execute findOneByQuery', error as Error, {
                 query,

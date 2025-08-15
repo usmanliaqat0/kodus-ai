@@ -121,12 +121,9 @@ export type RouterResultHandler = (
 export interface RouterConfig<TSchema extends z.ZodType = z.ZodType> {
     name: string;
     description?: string;
-    routes: Record<
-        string,
-        AgentId | AgentDefinition<unknown, unknown, unknown>
-    >;
+    routes: Record<string, AgentId | AgentDefinition>;
     intentSchema: TSchema;
-    fallback?: AgentId | AgentDefinition<unknown, unknown, unknown>;
+    fallback?: AgentId | AgentDefinition;
 
     // Advanced routing options
     routingStrategy?:
@@ -225,10 +222,7 @@ export interface RoutingResult<T = unknown> {
  */
 export class Router<TSchema extends z.ZodType = z.ZodType> {
     private readonly logger = createLogger('Router');
-    private readonly agents = new Map<
-        string,
-        AgentDefinition<unknown, unknown, unknown>
-    >();
+    private readonly agents = new Map<string, AgentDefinition>();
     private readonly routeNames: string[];
     private readonly agentCapabilities = new Map<string, string[]>();
     private readonly agentTags = new Map<string, string[]>();
@@ -237,10 +231,7 @@ export class Router<TSchema extends z.ZodType = z.ZodType> {
 
     constructor(
         public readonly config: RouterConfig<TSchema>,
-        agentRegistry: Map<
-            string,
-            AgentDefinition<unknown, unknown, unknown>
-        > = new Map(),
+        agentRegistry: Map<string, AgentDefinition> = new Map(),
         kernelHandler?: MultiKernelHandler,
     ) {
         this.routeNames = Object.keys(config.routes);
@@ -489,7 +480,7 @@ export class Router<TSchema extends z.ZodType = z.ZodType> {
             // Try fallback if available
             if (this.config.fallback) {
                 return await this.executeFallback(
-                    input as TInput,
+                    input,
                     context,
                     executionId,
                     finalCriteria,
@@ -544,7 +535,7 @@ export class Router<TSchema extends z.ZodType = z.ZodType> {
 
     private initializeAgentMetadata(
         route: string,
-        _agent: AgentDefinition<unknown, unknown, unknown>,
+        _agent: AgentDefinition,
     ): void {
         // Initialize with default metadata
         this.agentCapabilities.set(route, []);
@@ -1127,10 +1118,7 @@ export class Router<TSchema extends z.ZodType = z.ZodType> {
     /**
      * Add new route
      */
-    addRoute(
-        route: string,
-        agent: AgentDefinition<unknown, unknown, unknown>,
-    ): void {
+    addRoute(route: string, agent: AgentDefinition): void {
         this.agents.set(route, agent);
         this.routeNames.push(route);
         this.initializeAgentMetadata(route, agent);
@@ -2022,11 +2010,7 @@ export class Router<TSchema extends z.ZodType = z.ZodType> {
                     mappedStrategy = 'adaptive';
                 }
 
-                finalStrategy = mappedStrategy as
-                    | 'parallel'
-                    | 'sequential'
-                    | 'conditional'
-                    | 'adaptive';
+                finalStrategy = mappedStrategy;
                 confidence = highestConfidenceRule.confidence;
                 reasoning = `${highestConfidenceRule.reasoning}. ${ruleEvaluation.conflictResolution || ''}`;
             }
@@ -2140,7 +2124,7 @@ export class Router<TSchema extends z.ZodType = z.ZodType> {
  */
 export function createRouter<TSchema extends z.ZodType = z.ZodType>(
     config: RouterConfig<TSchema>,
-    agentRegistry?: Map<string, AgentDefinition<unknown, unknown, unknown>>,
+    agentRegistry?: Map<string, AgentDefinition>,
 ): Router<TSchema> {
     return new Router(config, agentRegistry);
 }
@@ -2151,7 +2135,7 @@ export function createRouter<TSchema extends z.ZodType = z.ZodType>(
 export function routerAsAgent<TSchema extends z.ZodType = z.ZodType>(
     router: Router<TSchema>,
     name?: string,
-): AgentDefinition<z.infer<TSchema>, unknown, unknown> {
+): AgentDefinition<z.infer<TSchema>> {
     // Return agent-compatible object without circular dependency
     return {
         name: name || `router-${router.config.name}`,

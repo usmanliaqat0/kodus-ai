@@ -152,7 +152,7 @@ export interface EmitResult {
  */
 export interface Runtime {
     // Event handling
-    on(eventType: EventType, handler: EventHandler<AnyEvent>): void;
+    on(eventType: EventType, handler: EventHandler): void;
     emit<T extends EventType>(
         eventType: T,
         data?: EventPayloads[T],
@@ -163,7 +163,7 @@ export interface Runtime {
         data?: EventPayloads[T],
         options?: EmitOptions,
     ): Promise<EmitResult>;
-    off(eventType: EventType, handler: EventHandler<AnyEvent>): void;
+    off(eventType: EventType, handler: EventHandler): void;
 
     // Processing
     process(withStats?: boolean): Promise<void | {
@@ -377,7 +377,7 @@ export function createRuntime(
 
     return {
         // Event handling
-        on(eventType: EventType, handler: EventHandler<AnyEvent>) {
+        on(eventType: EventType, handler: EventHandler) {
             // Registrar handler no OptimizedEventProcessor para aplicar middlewares
             eventProcessor.registerHandler(eventType, handler);
         },
@@ -506,7 +506,7 @@ export function createRuntime(
             }
         },
 
-        off(eventType: EventType, handler: EventHandler<AnyEvent>) {
+        off(eventType: EventType, handler: EventHandler) {
             // LIMITATION: OptimizedEventProcessor não suporta remoção de handlers específicos
             // Por enquanto, apenas logamos um warning
             if (enableObservability) {

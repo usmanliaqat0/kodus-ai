@@ -48,19 +48,19 @@ export interface SessionConfig {
     adapterOptions?: Record<string, unknown>;
 }
 
-export interface SessionContext {
+export interface SessionContext<T> {
     id: SessionId;
     threadId: ThreadId;
     tenantId: TenantId;
-    stateManager: ContextStateService;
+    stateManager: ContextStateService<T>;
     conversationHistory: Session['conversationHistory'];
     metadata: Record<string, unknown>;
 }
 
-export class SessionService {
+export class SessionService<T> {
     // ✅ HYBRID: RAM cache + persistent storage
     private sessions = new Map<string, Session>();
-    private sessionStateManagers = new Map<string, ContextStateService>();
+    private sessionStateManagers = new Map<string, ContextStateService<T>>();
     private storage?: StorageSessionAdapter;
     private logger = createLogger('session-service');
     private config: Required<SessionConfig>;
@@ -76,16 +76,16 @@ export class SessionService {
         });
 
         this.config = {
-            maxSessions: config.maxSessions || 1000,
-            sessionTimeout: config.sessionTimeout || 30 * 60 * 1000, // 30 min
-            maxConversationHistory: config.maxConversationHistory || 100,
+            maxSessions: config.maxSessions ?? 1000,
+            sessionTimeout: config.sessionTimeout ?? 30 * 60 * 1000, // 30 min
+            maxConversationHistory: config.maxConversationHistory ?? 100,
             enableAutoCleanup: config.enableAutoCleanup !== false,
-            cleanupInterval: config.cleanupInterval || 5 * 60 * 1000, // 5 min
+            cleanupInterval: config.cleanupInterval ?? 5 * 60 * 1000, // 5 min
             // ✅ CORRECTED: Use adapterType consistently
             persistent: config.persistent ?? true,
-            adapterType: config.adapterType || 'memory',
-            connectionString: config.connectionString || '',
-            adapterOptions: config.adapterOptions || {},
+            adapterType: config.adapterType ?? 'memory',
+            connectionString: config.connectionString ?? '',
+            adapterOptions: config.adapterOptions ?? {},
         };
 
         this.logger.info('🔍 [DEBUG] SessionService final config', {
@@ -95,8 +95,11 @@ export class SessionService {
         });
 
         // Initialize asynchronously
-        this.initializeStorage().catch((e) => {
-            this.logger.error('Failed to initialize storage adapter', e);
+        this.initializeStorage().catch((e: unknown) => {
+            this.logger.error(
+                'Failed to initialize storage adapter',
+                e as Error,
+            );
         });
 
         if (this.config.enableAutoCleanup) {
@@ -129,9 +132,9 @@ export class SessionService {
                 connectionString: this.config.connectionString,
                 options: {
                     ...this.config.adapterOptions,
-                    database: this.config.adapterOptions?.database || 'kodus',
+                    database: this.config.adapterOptions.database ?? 'kodus',
                     collection:
-                        this.config.adapterOptions?.collection || 'sessions',
+                        this.config.adapterOptions.collection ?? 'sessions',
                 },
                 timeout: 10000,
                 retries: 3,
@@ -148,7 +151,7 @@ export class SessionService {
             await this.storage.initialize();
 
             // ✅ LOAD: Restore active sessions from storage
-            await this.loadActiveSessions();
+            this.loadActiveSessions();
 
             this.isInitialized = true;
             this.logger.info('SessionService storage initialized', {
@@ -179,7 +182,7 @@ export class SessionService {
     /**
      * ✅ NEW: Load active sessions from storage
      */
-    private async loadActiveSessions(): Promise<void> {
+    private loadActiveSessions(): void {
         if (!this.storage) return;
 
         try {
@@ -218,7 +221,7 @@ export class SessionService {
         };
 
         // Criar state manager para a sessão
-        const stateManager = new ContextStateService(
+        const stateManager = new ContextStateService<T>(
             { sessionId },
             {
                 maxNamespaceSize: 1000,
@@ -266,7 +269,7 @@ export class SessionService {
                 // Cache the loaded session
                 this.sessions.set(sessionId, session);
                 // Recreate state manager
-                const stateManager = new ContextStateService(
+                const stateManager = new ContextStateService<T>(
                     { sessionId },
                     {
                         maxNamespaceSize: 1000,
@@ -331,7 +334,7 @@ export class SessionService {
                 if (found) {
                     // Cachear e criar state manager
                     this.sessions.set(found.id, found);
-                    const stateManager = new ContextStateService(
+                    const stateManager = new ContextStateService<T>(
                         { sessionId: found.id },
                         {
                             maxNamespaceSize: 1000,
@@ -358,7 +361,7 @@ export class SessionService {
      */
     async getSessionContext(
         sessionId: string,
-    ): Promise<SessionContext | undefined> {
+    ): Promise<SessionContext<T> | undefined> {
         const session = await this.getSession(sessionId);
         if (!session) {
             return undefined;
@@ -472,10 +475,7 @@ export class SessionService {
             return result;
         };
 
-        session.contextData = deepMerge(
-            session.contextData as Record<string, unknown>,
-            updates,
-        );
+        session.contextData = deepMerge(session.contextData, updates);
         session.lastActivity = Date.now();
 
         // ✅ SYNC: Persist changes if enabled
@@ -493,7 +493,7 @@ export class SessionService {
         sessionId: string,
     ): Promise<Record<string, unknown>> {
         const session = await this.getSession(sessionId);
-        return (session?.contextData as Record<string, unknown>) || {};
+        return session?.contextData ?? {};
     }
 
     /**
@@ -746,7 +746,7 @@ export class SessionService {
         if (this.config.persistent && this.storage) {
             // Persist all active sessions before cleanup
             const persistPromises = Array.from(this.sessions.values()).map(
-                (session) => this.storage!.storeSession(session),
+                (session) => this.storage?.storeSession(session),
             );
             await Promise.allSettled(persistPromises);
 

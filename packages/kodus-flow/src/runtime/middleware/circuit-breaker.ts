@@ -102,8 +102,7 @@ export class CircuitBreakerManager {
  * Factory para middleware de Circuit Breaker
  */
 export const circuitBreakerMiddleware: MiddlewareFactoryType<
-    CircuitBreakerMiddlewareConfig,
-    Event
+    CircuitBreakerMiddlewareConfig
 > = (config: CircuitBreakerMiddlewareConfig) => {
     const middleware = (<T extends Event>(
         handler: EventHandler<T>,
@@ -185,7 +184,7 @@ export const circuitBreakerMiddleware: MiddlewareFactoryType<
             // Retornar resultado
             return result.result;
         };
-    }) as Middleware<Event>;
+    }) as Middleware;
 
     middleware.kind = 'pipeline';
     (middleware as unknown as { displayName?: string }).displayName =

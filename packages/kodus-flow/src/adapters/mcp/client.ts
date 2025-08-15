@@ -173,13 +173,11 @@ class MetricsCollector {
         }
 
         // Tenant metrics
-        if (!this.metrics.tenantMetrics[this.tenantId]) {
-            this.metrics.tenantMetrics[this.tenantId] = {
-                requests: 0,
-                tokensUsed: 0,
-                errors: 0,
-            };
-        }
+        this.metrics.tenantMetrics[this.tenantId] ??= {
+            requests: 0,
+            tokensUsed: 0,
+            errors: 0,
+        };
 
         const tenantMetric = this.metrics.tenantMetrics[this.tenantId];
         if (tenantMetric) {
@@ -279,7 +277,7 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
         super();
 
         // Initialize tenant context
-        const tenantId = config.tenant?.tenantId || 'default';
+        const tenantId = config.tenant?.tenantId ?? 'default';
 
         // Initialize monitoring
         this.metricsCollector = new MetricsCollector(tenantId);
@@ -297,24 +295,24 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
         this.client = new Client(config.clientInfo, {
             capabilities: {
                 // Roots capability
-                roots: (config.capabilities.roots || { listChanged: true }) as {
+                roots: (config.capabilities.roots ?? { listChanged: true }) as {
                     [x: string]: unknown;
                     listChanged?: boolean;
                 },
 
                 // Sampling capability
-                sampling: (config.capabilities.sampling || {}) as {
+                sampling: (config.capabilities.sampling ?? {}) as {
                     [x: string]: unknown;
                 },
 
                 // Elicitation capability
-                elicitation: (config.capabilities.elicitation || {}) as {
+                elicitation: (config.capabilities.elicitation ?? {}) as {
                     [x: string]: unknown;
                 },
             },
         });
 
-        this.allowedTools = config.allowedTools || [];
+        this.allowedTools = config.allowedTools ?? [];
 
         this.setupNotificationHandlers();
         this.setupMetricsCollection();
@@ -468,7 +466,7 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
             this.metricsCollector.recordConnection(true);
 
             // Auto-load roots if server supports them
-            if (this.serverCapabilities?.roots) {
+            if (this.serverCapabilities.roots) {
                 try {
                     await this.listRoots();
                 } catch (error) {
@@ -522,7 +520,7 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
                 error: error instanceof Error ? error.message : String(error),
             });
         } finally {
-            await this.cleanup();
+            this.cleanup();
         }
     }
 
@@ -550,9 +548,9 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
             throw new Error('Human approval handler required for sampling');
         }
 
-        const approval = await this.approvalHandler.requestApproval({
+        const approval = this.approvalHandler.requestApproval({
             type: 'sampling',
-            message: `Request to create LLM message with ${request.messages.length} messages`,
+            message: `Request to create LLM message with ${request.messages.length.toString()} messages`,
             context: {
                 server: 'current',
                 action: 'sampling/createMessage',
@@ -574,7 +572,7 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
 
         if (!approval.approved) {
             throw new Error(
-                `Sampling request denied: ${approval.reason || 'No reason provided'}`,
+                `Sampling request denied: ${approval.reason ?? 'No reason provided'}`,
             );
         }
 
@@ -625,7 +623,7 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
             throw new Error('Human approval handler required for elicitation');
         }
 
-        const approval = await this.approvalHandler.requestApproval({
+        const approval = this.approvalHandler.requestApproval({
             type: 'elicitation',
             message: `Request user information: ${request.message}`,
             context: {
@@ -641,7 +639,7 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
 
         if (!approval.approved) {
             throw new Error(
-                `Elicitation request denied: ${approval.reason || 'No reason provided'}`,
+                `Elicitation request denied: ${approval.reason ?? 'No reason provided'}`,
             );
         }
 
@@ -679,20 +677,20 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
             const result = await this.client.listTools();
 
             // ✅ ADDED: Validate result structure
-            if (!result || typeof result !== 'object') {
+            if (typeof result !== 'object') {
                 this.logger?.warn('Invalid tools result received', { result });
                 return [];
             }
 
             // ✅ ADDED: Validate tools array
-            if (!result.tools || !Array.isArray(result.tools)) {
+            if (!Array.isArray(result.tools)) {
                 this.logger?.warn('Invalid tools array received', { result });
                 return [];
             }
 
             // ✅ ADDED: Validate each tool before filtering
             let validTools = result.tools.filter((tool) => {
-                if (!tool || typeof tool !== 'object') {
+                if (typeof tool !== 'object') {
                     this.logger?.warn('Invalid tool structure', { tool });
                     return false;
                 }
@@ -700,17 +698,6 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
                 if (!tool.name || typeof tool.name !== 'string') {
                     this.logger?.warn('Invalid tool name', { tool });
                     return false;
-                }
-
-                // ✅ ADDED: Ensure inputSchema exists and is valid
-                if (!tool.inputSchema) {
-                    this.logger?.warn(
-                        'Tool missing inputSchema, using fallback',
-                        {
-                            toolName: tool.name,
-                        },
-                    );
-                    tool.inputSchema = { type: 'object', properties: {} };
                 }
 
                 // ✅ ADDED: Validate outputSchema if provided
@@ -748,7 +735,7 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
                 );
             }
 
-            return validTools || [];
+            return validTools;
         } catch (error) {
             // ✅ ADDED: Enhanced error handling for SDK errors
             this.logger?.error(
@@ -777,7 +764,7 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
         }
 
         const result = await this.client.listResources();
-        this.resourcesCache = result.resources || [];
+        this.resourcesCache = result.resources;
         return this.resourcesCache;
     }
 
@@ -789,7 +776,7 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
         }
 
         const result = await this.client.listPrompts();
-        this.promptsCache = result.prompts || [];
+        this.promptsCache = result.prompts;
         return this.promptsCache;
     }
 
@@ -800,8 +787,8 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
         name: string,
         args?: Record<string, unknown>,
     ): Promise<CallToolResult> {
-        const maxRetries = this.config.transport.retries || 1;
-        const timeout = this.config.transport.timeout || 60000; // ✅ UNIFIED: 60s timeout
+        const maxRetries = this.config.transport.retries ?? 1;
+        const timeout = this.config.transport.timeout ?? 60000; // ✅ UNIFIED: 60s timeout
         let lastError: Error = new Error('Unknown error');
         const startTime = Date.now();
 
@@ -812,7 +799,7 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
                     setTimeout(() => {
                         reject(
                             new Error(
-                                `MCP tool execution timeout after ${timeout}ms`,
+                                `MCP tool execution timeout after ${timeout.toString()}ms`,
                             ),
                         );
                     }, timeout);
@@ -886,7 +873,7 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
             },
         );
 
-        throw lastError!;
+        throw lastError;
     }
 
     /**
@@ -956,7 +943,7 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
 
             const result = (await this.client.callTool({
                 name,
-                arguments: args || {},
+                arguments: args ?? {},
             })) as CallToolResult;
 
             this.metricsCollector.recordRequest(
@@ -1067,9 +1054,9 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
      */
     static createSimpleApprovalHandler(): HumanApprovalHandler {
         return {
-            async requestApproval(
+            requestApproval(
                 request: HumanApprovalRequest,
-            ): Promise<HumanApprovalResponse> {
+            ): HumanApprovalResponse {
                 // Development: For production, replace with proper approval UI
                 // // console.warn removed
                 // // console.warn removed
@@ -1078,7 +1065,7 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
 
                 // For development: auto-approve low risk, deny high risk
                 const riskLevel =
-                    request.context.security?.riskLevel || 'medium';
+                    request.context.security?.riskLevel ?? 'medium';
 
                 if (riskLevel === 'low') {
                     // console.warn('✅ Auto-approved (low risk)');
@@ -1254,7 +1241,7 @@ export class SpecCompliantMCPClient extends EventEmitter<MCPClientEvents> {
         }
     }
 
-    private async cleanup(): Promise<void> {
+    private cleanup(): void {
         this.connected = false;
         this.serverCapabilities = null;
         this.transport = null;

@@ -602,7 +602,7 @@ export class PlanAndExecutePlanner implements Planner {
 
             // 3. WORKING STATE: Get relevant planner state
             const plannerState =
-                await context.agentContext.state.getNamespace('planner');
+                context.agentContext.state.getNamespace('planner');
             if (plannerState && plannerState.size > 0) {
                 contextParts.push('\n⚡ Current context:');
                 let count = 0;
@@ -936,7 +936,7 @@ export class PlanAndExecutePlanner implements Planner {
               }
             | undefined;
         const needs: string[] = Array.isArray(rawSignals?.needs)
-            ? (rawSignals!.needs as unknown[])
+            ? (rawSignals.needs as unknown[])
                   .filter((x) => typeof x === 'string')
                   .map((x) => String(x))
             : [];
@@ -944,40 +944,36 @@ export class PlanAndExecutePlanner implements Planner {
         const noDiscoveryPath: string[] | undefined = Array.isArray(
             rawSignals?.noDiscoveryPath,
         )
-            ? (rawSignals!.noDiscoveryPath as unknown[])
+            ? (rawSignals.noDiscoveryPath as unknown[])
                   .filter((x) => typeof x === 'string')
                   .map((x) => String(x))
             : undefined;
         const errorsFromSignals: string[] | undefined = Array.isArray(
             rawSignals?.errors,
         )
-            ? (rawSignals!.errors as unknown[])
+            ? (rawSignals.errors as unknown[])
                   .filter((x) => typeof x === 'string')
                   .map((x) => String(x))
             : undefined;
         const suggestedNextStep: string | undefined =
             typeof rawSignals?.suggestedNextStep === 'string'
-                ? (rawSignals!.suggestedNextStep as string)
+                ? rawSignals.suggestedNextStep
                 : undefined;
         if (noDiscoveryPath && newPlan.metadata) {
-            (newPlan.metadata as Record<string, unknown>).noDiscoveryPath =
-                noDiscoveryPath;
+            newPlan.metadata.noDiscoveryPath = noDiscoveryPath;
         }
         if (errorsFromSignals && newPlan.metadata) {
-            (newPlan.metadata as Record<string, unknown>).errors =
-                errorsFromSignals;
+            newPlan.metadata.errors = errorsFromSignals;
         }
         if (suggestedNextStep && newPlan.metadata) {
-            (newPlan.metadata as Record<string, unknown>).suggestedNextStep =
-                suggestedNextStep;
+            newPlan.metadata.suggestedNextStep = suggestedNextStep;
         }
 
         if (needs.length > 0) {
             // ✅ VERIFICAR SE JÁ EXCEDEU MAX REPLANS
             const currentPlan = this.getCurrentPlan(context);
             const prevReplans = Number(
-                (currentPlan?.metadata as Record<string, unknown> | undefined)
-                    ?.replansCount ?? 0,
+                currentPlan?.metadata?.replansCount ?? 0,
             );
 
             // ✅ SÓ REPLAN SE NÃO EXCEDEU LIMITE
@@ -1028,9 +1024,7 @@ export class PlanAndExecutePlanner implements Planner {
                 const elapsed = previousPlan.metadata?.startTime
                     ? Date.now() - (previousPlan.metadata.startTime as number)
                     : undefined;
-                const replansCount = (
-                    previousPlan.metadata as Record<string, unknown> | undefined
-                )?.replansCount;
+                const replansCount = previousPlan.metadata?.replansCount;
                 await context.agentContext.session.addEntry(
                     { type: 'planner.replan.completed' },
                     {
@@ -1039,11 +1033,7 @@ export class PlanAndExecutePlanner implements Planner {
                         newPlanId: newPlan.id,
                         replansCount,
                         elapsedMs: elapsed,
-                        cause: (
-                            previousPlan.metadata as
-                                | Record<string, unknown>
-                                | undefined
-                        )?.replanCause,
+                        cause: previousPlan.metadata?.replanCause,
                     },
                 );
             } catch {}
@@ -1720,10 +1710,7 @@ export class PlanAndExecutePlanner implements Planner {
         }
 
         // Build structured template only if replanContext exists
-        const contextForReplan = replanContext.contextForReplan as Record<
-            string,
-            unknown
-        >;
+        const contextForReplan = replanContext.contextForReplan;
         const successfulSteps =
             (contextForReplan?.successfulSteps as unknown[]) || [];
         const failedSteps = (contextForReplan?.failedSteps as unknown[]) || [];
@@ -2275,7 +2262,7 @@ export class PlanAndExecutePlanner implements Planner {
                                             try {
                                                 // Parse the JSON string to get the actual data
                                                 actualResult = JSON.parse(
-                                                    firstContent.text as string,
+                                                    firstContent.text,
                                                 );
                                                 this.logger.info(
                                                     '🔧 PARSED JSON FROM TOOL RESULT',
@@ -2816,7 +2803,9 @@ export class PlanAndExecutePlanner implements Planner {
             if (depth > 10) return; // Prevent infinite recursion
 
             if (Array.isArray(current)) {
-                current.forEach((item) => search(item, depth + 1));
+                current.forEach((item) => {
+                    search(item, depth + 1);
+                });
             } else if (current && typeof current === 'object') {
                 const record = current as Record<string, unknown>;
 

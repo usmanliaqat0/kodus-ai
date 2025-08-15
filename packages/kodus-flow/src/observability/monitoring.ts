@@ -229,8 +229,7 @@ export class LayeredMetricsSystem {
                 unknown
             >;
             if (categoryMetrics && typeof categoryMetrics === 'object') {
-                (categoryMetrics as Record<string, unknown>)[metric as string] =
-                    value;
+                categoryMetrics[metric as string] = value;
             }
         } catch (error) {
             this.logger.error(
@@ -261,8 +260,7 @@ export class LayeredMetricsSystem {
                 unknown
             >;
             if (categoryMetrics && typeof categoryMetrics === 'object') {
-                (categoryMetrics as Record<string, unknown>)[metric as string] =
-                    value;
+                categoryMetrics[metric as string] = value;
             }
         } catch (error) {
             this.logger.error(
@@ -293,8 +291,7 @@ export class LayeredMetricsSystem {
                 unknown
             >;
             if (categoryMetrics && typeof categoryMetrics === 'object') {
-                (categoryMetrics as Record<string, unknown>)[metric as string] =
-                    value;
+                categoryMetrics[metric as string] = value;
             }
         } catch (error) {
             this.logger.error(
@@ -325,13 +322,9 @@ export class LayeredMetricsSystem {
                 unknown
             >;
             if (categoryMetrics && typeof categoryMetrics === 'object') {
-                const currentValue = (
-                    categoryMetrics as Record<string, unknown>
-                )[metric as string];
+                const currentValue = categoryMetrics[metric as string];
                 if (typeof currentValue === 'number') {
-                    (categoryMetrics as Record<string, unknown>)[
-                        metric as string
-                    ] = currentValue + delta;
+                    categoryMetrics[metric as string] = currentValue + delta;
                 }
             }
         } catch (error) {
@@ -363,13 +356,9 @@ export class LayeredMetricsSystem {
                 unknown
             >;
             if (categoryMetrics && typeof categoryMetrics === 'object') {
-                const currentValue = (
-                    categoryMetrics as Record<string, unknown>
-                )[metric as string];
+                const currentValue = categoryMetrics[metric as string];
                 if (typeof currentValue === 'number') {
-                    (categoryMetrics as Record<string, unknown>)[
-                        metric as string
-                    ] = currentValue + delta;
+                    categoryMetrics[metric as string] = currentValue + delta;
                 }
             }
         } catch (error) {
@@ -401,13 +390,9 @@ export class LayeredMetricsSystem {
                 unknown
             >;
             if (categoryMetrics && typeof categoryMetrics === 'object') {
-                const currentValue = (
-                    categoryMetrics as Record<string, unknown>
-                )[metric as string];
+                const currentValue = categoryMetrics[metric as string];
                 if (typeof currentValue === 'number') {
-                    (categoryMetrics as Record<string, unknown>)[
-                        metric as string
-                    ] = currentValue + delta;
+                    categoryMetrics[metric as string] = currentValue + delta;
                 }
             }
         } catch (error) {

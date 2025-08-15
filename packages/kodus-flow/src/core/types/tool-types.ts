@@ -73,10 +73,10 @@ export const toolParameterSchema = z.object({
     properties: z
         .record(
             z.string(),
-            z.lazy((): z.ZodType<unknown> => toolParameterSchema),
+            z.lazy((): z.ZodType => toolParameterSchema),
         )
         .optional(),
-    items: z.lazy((): z.ZodType<unknown> => toolParameterSchema).optional(),
+    items: z.lazy((): z.ZodType => toolParameterSchema).optional(),
     default: z.unknown().optional(),
 });
 export type ToolParameter = z.infer<typeof toolParameterSchema>;
@@ -103,13 +103,13 @@ export interface ToolDefinition<TInput = unknown, TOutput = unknown>
 
     // === SCHEMA ZOD (PRIMÁRIO) ===
     /** Schema Zod para validação de entrada - PADRÃO INTERNO */
-    inputSchema: z.ZodSchema<TInput>;
+    inputSchema: z.ZodType<TInput>;
 
     // === JSON SCHEMA (GERADO AUTOMATICAMENTE) ===
     /** JSON Schema gerado automaticamente do Zod para LLMs */
     inputJsonSchema?: ToolJSONSchema;
 
-    outputSchema?: z.ZodSchema<TOutput>;
+    outputSchema?: z.ZodType<TOutput>;
     outputJsonSchema?: ToolJSONSchema;
 
     // === CONFIGURAÇÃO ===
@@ -763,7 +763,7 @@ export function createToolContext(
     return {
         // BaseContext
         tenantId: tenantId || 'default',
-        correlationId: options.correlationId || 'default',
+        correlationId: options.correlationId ?? 'default',
         startTime: Date.now(),
 
         // ToolContext specific
@@ -814,9 +814,9 @@ export function validateToolCall(call: unknown): call is ToolCall {
 export function defineTool<TInput = unknown, TOutput = unknown>(config: {
     name: string;
     description: string;
-    inputSchema: z.ZodSchema<TInput>;
+    inputSchema: z.ZodType<TInput>;
     execute: ToolHandler<TInput, TOutput>;
-    outputSchema?: z.ZodSchema<TOutput>;
+    outputSchema?: z.ZodType<TOutput>;
     config?: ToolDefinition<TInput, TOutput>['config'];
     categories?: string[];
     dependencies?: string[];
@@ -849,9 +849,9 @@ export function defineTool<TInput = unknown, TOutput = unknown>(config: {
             source: 'user',
             ...config.config,
         },
-        categories: config.categories || [],
-        dependencies: config.dependencies || [],
-        tags: config.tags || [],
+        categories: config.categories ?? [],
+        dependencies: config.dependencies ?? [],
+        tags: config.tags ?? [],
         callbacks: config.callbacks,
     };
 }
@@ -865,11 +865,10 @@ export function defineMCPTool<TInput = unknown, TOutput = unknown>(config: {
     execute: ToolHandler<TInput, TOutput>;
     serverName: string;
     originalMCPSchema?: unknown;
-    inputSchema?: z.ZodSchema<TInput>;
+    inputSchema?: z.ZodType<TInput>;
 }): ToolDefinition<TInput, TOutput> {
     // Se não tem Zod schema, cria um genérico
-    const zodSchema =
-        config.inputSchema || (z.unknown() as z.ZodSchema<TInput>);
+    const zodSchema = config.inputSchema ?? (z.unknown() as z.ZodType<TInput>);
 
     return defineTool({
         name: config.name,
@@ -899,7 +898,7 @@ export function fromMCPTool<TInput = unknown, TOutput = unknown>(
 ): ToolDefinition<TInput, TOutput> {
     return defineMCPTool({
         name: mcpTool.name,
-        description: mcpTool.description || `MCP Tool: ${mcpTool.name}`,
+        description: mcpTool.description ?? `MCP Tool: ${mcpTool.name}`,
         execute: mcpTool.execute as ToolHandler<TInput, TOutput>,
         serverName,
         originalMCPSchema: mcpTool.inputSchema,
@@ -1044,7 +1043,7 @@ export function createToolPerformanceMonitor(
         recordExecution(toolName: string, duration: number, success: boolean) {
             if (!isRunning || Math.random() > config.samplingRate) return;
 
-            const history = executionHistory.get(toolName) || [];
+            const history = executionHistory.get(toolName) ?? [];
             history.push({ duration, success, timestamp: Date.now() });
 
             // Manter apenas o histórico configurado
@@ -1154,7 +1153,7 @@ export function createToolPerformanceMonitor(
                 ),
                 toolName: 'aggregate',
                 executionStrategy: 'adaptive' as ToolExecutionStrategy,
-                tenantId: allMetrics[0]?.tenantId || 'unknown',
+                tenantId: allMetrics[0]?.tenantId ?? 'unknown',
                 timestamp: Date.now(),
             };
         },
@@ -1163,11 +1162,11 @@ export function createToolPerformanceMonitor(
             const aggregated = monitor.getAggregatedMetrics();
             return `
 === Tool Performance Report ===
-Total Executions: ${aggregated.totalExecutions}
+Total Executions: ${aggregated.totalExecutions.toString()}
 Success Rate: ${(aggregated.successRate * 100).toFixed(2)}%
 Average Execution Time: ${aggregated.averageExecutionTime.toFixed(2)}ms
-Max Concurrency: ${aggregated.maxConcurrency}
-Errors: ${aggregated.timeoutErrors + aggregated.validationErrors + aggregated.executionErrors}
+Max Concurrency: ${aggregated.maxConcurrency.toString()}
+Errors: ${(aggregated.timeoutErrors + aggregated.validationErrors + aggregated.executionErrors).toString()}
 ===============================`;
         },
 
@@ -1225,7 +1224,7 @@ Errors: ${aggregated.timeoutErrors + aggregated.validationErrors + aggregated.ex
     };
 
     function updateMetrics(toolName: string) {
-        const history = executionHistory.get(toolName) || [];
+        const history = executionHistory.get(toolName) ?? [];
         if (history.length === 0) return;
 
         const durations = history.map((h) => h.duration);
@@ -1236,8 +1235,8 @@ Errors: ${aggregated.timeoutErrors + aggregated.validationErrors + aggregated.ex
         const avgDuration = totalDuration / durations.length;
 
         const metrics: ToolExecutionMetrics = {
-            startTime: history[0]?.timestamp || Date.now(),
-            endTime: history[history.length - 1]?.timestamp || Date.now(),
+            startTime: history[0]?.timestamp ?? Date.now(),
+            endTime: history[history.length - 1]?.timestamp ?? Date.now(),
             totalExecutionTime: totalDuration,
             averageExecutionTime: avgDuration,
             totalExecutions: history.length,

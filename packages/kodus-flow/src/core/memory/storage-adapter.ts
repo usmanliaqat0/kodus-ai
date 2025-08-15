@@ -34,14 +34,14 @@ export class StorageMemoryAdapter implements MemoryAdapter {
             options: {
                 ...this.config.options,
                 // ✅ MEMORY: Use specific collection for Memory data
-                database: this.config.options?.database || 'kodus',
-                collection: this.config.options?.collection || 'memories',
+                database: this.config.options?.database ?? 'kodus',
+                collection: this.config.options?.collection ?? 'memories',
             },
             maxItems: 10000,
             enableCompression: true,
             cleanupInterval: 300000,
-            timeout: this.config.timeout || 5000,
-            retries: this.config.retries || 3,
+            timeout: this.config.timeout ?? 5000,
+            retries: this.config.retries ?? 3,
             enableObservability: true,
             enableHealthChecks: true,
             enableMetrics: true,
@@ -71,7 +71,11 @@ export class StorageMemoryAdapter implements MemoryAdapter {
             },
         };
 
-        await this.storage!.store(storageItem);
+        if (!this.storage) {
+            throw new Error('Storage not initialized');
+        }
+
+        await this.storage.store(storageItem);
         this.inMemoryIndex.set(storageItem.id, storageItem);
         logger.debug('Memory item stored', { id: item.id, type: item.type });
     }
@@ -79,9 +83,13 @@ export class StorageMemoryAdapter implements MemoryAdapter {
     async retrieve(id: string): Promise<MemoryItem | null> {
         await this.ensureInitialized();
 
+        if (!this.storage) {
+            throw new Error('Storage not initialized');
+        }
+
         const item =
-            (await this.storage!.retrieve(id)) ||
-            this.inMemoryIndex.get(id) ||
+            (await this.storage.retrieve(id)) ??
+            this.inMemoryIndex.get(id) ??
             null;
         if (!item) return null;
 
@@ -105,18 +113,18 @@ export class StorageMemoryAdapter implements MemoryAdapter {
 
         // Implementação básica usando o índice em memória (metadados)
         // Suporta filtros: type, key, tenantId, entityId, sessionId, contextId, range temporal, limit e ordenação
-        const query = _query || {};
+        const query = _query;
 
         const items = Array.from(this.inMemoryIndex.values());
 
         const filtered = items.filter((it) => {
-            const md = it.metadata || {};
+            const md = it.metadata ?? {};
             if (query.type && md.type !== query.type) return false;
             if (query.key && md.key !== query.key) return false;
             if (query.keyPattern && typeof md.key === 'string') {
                 try {
                     const re = new RegExp(query.keyPattern);
-                    if (!re.test(md.key as string)) return false;
+                    if (!re.test(md.key)) return false;
                 } catch {
                     // se regex inválida, ignora pattern
                 }
@@ -135,20 +143,20 @@ export class StorageMemoryAdapter implements MemoryAdapter {
         });
 
         // Ordenação
-        const sortBy = query.sortBy || 'timestamp';
+        const sortBy = query.sortBy ?? 'timestamp';
         const sortDir = query.sortDirection === 'asc' ? 1 : -1;
         filtered.sort((a, b) => {
             const av =
                 (a as unknown as Record<string, unknown>)[sortBy] ??
-                (a.metadata || {})[sortBy as string];
+                (a.metadata ?? {})[sortBy];
             const bv =
                 (b as unknown as Record<string, unknown>)[sortBy] ??
-                (b.metadata || {})[sortBy as string];
+                (b.metadata ?? {})[sortBy];
             if (typeof av === 'number' && typeof bv === 'number') {
                 return (av - bv) * sortDir;
             }
-            const as = String(av ?? '');
-            const bs = String(bv ?? '');
+            const as = typeof av === 'string' ? av : JSON.stringify(av ?? '');
+            const bs = typeof bv === 'string' ? bv : JSON.stringify(bv ?? '');
             return as.localeCompare(bs) * sortDir;
         });
 
@@ -177,7 +185,11 @@ export class StorageMemoryAdapter implements MemoryAdapter {
     async delete(id: string): Promise<boolean> {
         await this.ensureInitialized();
 
-        const deleted = await this.storage!.delete(id);
+        if (!this.storage) {
+            throw new Error('Storage not initialized');
+        }
+
+        const deleted = await this.storage.delete(id);
         if (deleted) {
             logger.debug('Memory item deleted', { id });
             this.inMemoryIndex.delete(id);
@@ -188,7 +200,11 @@ export class StorageMemoryAdapter implements MemoryAdapter {
     async clear(): Promise<void> {
         await this.ensureInitialized();
 
-        await this.storage!.clear();
+        if (!this.storage) {
+            throw new Error('Storage not initialized');
+        }
+
+        await this.storage.clear();
         this.inMemoryIndex.clear();
         logger.info('All memory items cleared');
     }
@@ -200,7 +216,11 @@ export class StorageMemoryAdapter implements MemoryAdapter {
     }> {
         await this.ensureInitialized();
 
-        const stats = await this.storage!.getStats();
+        if (!this.storage) {
+            throw new Error('Storage not initialized');
+        }
+
+        const stats = await this.storage.getStats();
 
         return {
             itemCount: stats.itemCount,
@@ -211,7 +231,12 @@ export class StorageMemoryAdapter implements MemoryAdapter {
 
     async isHealthy(): Promise<boolean> {
         await this.ensureInitialized();
-        return this.storage!.isHealthy();
+
+        if (!this.storage) {
+            throw new Error('Storage not initialized');
+        }
+
+        return this.storage.isHealthy();
     }
 
     async cleanup(): Promise<void> {

@@ -10,23 +10,23 @@ import type { ToolJSONSchema } from '../types/tool-types.js';
 type ZodInternalDef = {
     type: string;
     checks?: unknown[];
-    shape?: Record<string, z.ZodSchema>;
+    shape?: Record<string, z.ZodType>;
     values?: unknown[];
     value?: unknown;
-    options?: z.ZodSchema[];
-    innerType?: z.ZodSchema;
-    defaultValue?: unknown | (() => unknown);
-    valueType?: z.ZodSchema;
+    options?: z.ZodType[];
+    innerType?: z.ZodType;
+    defaultValue?: unknown;
+    valueType?: z.ZodType;
     entries?: Record<string, unknown>;
     description?: string;
-    element?: z.ZodSchema;
+    element?: z.ZodType;
 };
 
 /**
  * Converte um Zod schema para JSON Schema compatível com LLMs
  */
 export function zodToJSONSchema(
-    zodSchema: z.ZodSchema,
+    zodSchema: z.ZodType,
     name: string,
     description: string,
 ): ToolJSONSchema {
@@ -38,10 +38,13 @@ export function zodToJSONSchema(
         parameters: {
             type: 'object',
             properties:
-                (jsonSchema.properties as Record<string, unknown>) || {},
-            required: (jsonSchema.required as string[]) || [],
+                (jsonSchema.properties as
+                    | Record<string, unknown>
+                    | undefined) ?? {},
+            required: (jsonSchema.required as string[] | undefined) ?? [],
             additionalProperties:
-                (jsonSchema.additionalProperties as boolean) ?? false,
+                (jsonSchema.additionalProperties as boolean | undefined) ??
+                false,
         },
     };
 }
@@ -49,13 +52,13 @@ export function zodToJSONSchema(
 /**
  * Verifica se um schema Zod é opcional
  */
-function isOptional(schema: z.ZodSchema): boolean {
+function isOptional(schema: z.ZodType): boolean {
     // ✅ ADDED: Null/undefined check to prevent "_def" access error
-    if (!schema || typeof schema !== 'object') {
+    if (typeof schema !== 'object') {
         return false;
     }
 
-    const zodType = schema._def as ZodInternalDef;
+    const zodType = schema.def as ZodInternalDef | undefined;
 
     // ✅ ADDED: Additional null check for _def
     if (!zodType) {
@@ -77,13 +80,13 @@ function isOptional(schema: z.ZodSchema): boolean {
 
     // Check for union with undefined/null
     if (type === 'union' && zodType.options) {
-        const options = zodType.options as z.ZodSchema[];
+        const options = zodType.options;
         return options.some((option) => {
             // ✅ ADDED: Null check for option
-            if (!option || typeof option !== 'object') {
+            if (typeof option !== 'object') {
                 return false;
             }
-            const optionDef = option._def as ZodInternalDef;
+            const optionDef = option.def as ZodInternalDef | undefined;
             // ✅ ADDED: Null check for optionDef
             if (!optionDef) {
                 return false;
@@ -102,9 +105,9 @@ type ZodMaybeDef = { _def?: { description?: string } };
 /**
  * Extrai a descrição de um schema Zod (compatível com Zod 3 e 4)
  */
-export function extractDescription(schema: z.ZodSchema): string | undefined {
+export function extractDescription(schema: z.ZodType): string | undefined {
     // ✅ ADDED: Null/undefined check
-    if (!schema || typeof schema !== 'object') {
+    if (typeof schema !== 'object') {
         return undefined;
     }
 
@@ -121,14 +124,14 @@ export function extractDescription(schema: z.ZodSchema): string | undefined {
  * Converte recursivamente um Zod schema para objeto JSON Schema
  */
 function zodSchemaToJsonSchemaObject(
-    schema: z.ZodSchema,
+    schema: z.ZodType,
 ): Record<string, unknown> {
     // ✅ ADDED: Null/undefined check to prevent "_def" access error
-    if (!schema || typeof schema !== 'object') {
+    if (typeof schema !== 'object') {
         return { type: 'string' }; // Fallback to string type
     }
 
-    const zodType = schema._def as ZodInternalDef;
+    const zodType = schema.def as ZodInternalDef | undefined;
 
     // ✅ ADDED: Null check for _def
     if (!zodType) {
@@ -184,7 +187,7 @@ function zodSchemaToJsonSchemaObject(
                 return addDescription({ type: 'array' });
             }
             const arrayItems = zodSchemaToJsonSchemaObject(
-                zodType.element as unknown as z.ZodSchema,
+                zodType.element as unknown as z.ZodType,
             );
             return addDescription({
                 type: 'array',
@@ -204,7 +207,7 @@ function zodSchemaToJsonSchemaObject(
             const shape = zodType.shape;
 
             for (const [key, value] of Object.entries(shape)) {
-                const valueSchema = value as z.ZodSchema;
+                const valueSchema = value;
                 properties[key] = zodSchemaToJsonSchemaObject(valueSchema);
 
                 // ✅ IMPROVED: Better required field detection
@@ -243,7 +246,7 @@ function zodSchemaToJsonSchemaObject(
                 return addDescription({ type: 'string' });
             }
 
-            const unionSchemas = zodType.options as z.ZodSchema[];
+            const unionSchemas = zodType.options;
             if (unionSchemas.length === 0) {
                 return addDescription({ type: 'string' });
             }

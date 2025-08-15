@@ -15,14 +15,12 @@ export interface EnhancedEventDef<P = void, K extends EventType = EventType>
     /**
      * Create an event with the specified data and better type inference
      */
-    with<T extends P & EventPayloads[K] = P & EventPayloads[K]>(
-        data: T,
-    ): Event<K>;
+    with(data: P & EventPayloads[K]): Event<K>;
 
     /**
      * Create a typed handler for this event
      */
-    handler<R = Event | void>(
+    handler<R = Event | undefined>(
         handler: (event: Event<K>) => R | Promise<R>,
     ): EventHandler<Event<K>>;
 
@@ -37,9 +35,6 @@ export interface EnhancedEventDef<P = void, K extends EventType = EventType>
  */
 export interface EnhancedWorkflowEventFactory {
     <P = void, K extends EventType = EventType>(
-        type: K,
-    ): EnhancedEventDef<P, K>;
-    <P, K extends EventType = EventType>(
         type: K,
         schema?: (data: unknown) => data is P,
     ): EnhancedEventDef<P, K>;
@@ -60,7 +55,7 @@ export type InferEventKey<T> = T extends EventDef<unknown, infer K> ? K : never;
  * Infer handler return type
  */
 export type InferHandlerReturn<T> =
-    T extends EventHandler<Event<EventType>, infer R> ? R : never;
+    T extends EventHandler<Event, infer R> ? R : never;
 
 /**
  * Create a union type from multiple event definitions
@@ -86,7 +81,7 @@ export interface EventMatcher<T extends Event = Event> {
      */
     on<E extends T>(
         eventDef: EventDef<InferEventPayload<E>, InferEventKey<E>>,
-        handler: (event: E) => Event | void | Promise<Event | void>,
+        handler: (event: E) => Event | undefined | Promise<Event | undefined>,
     ): EventMatcher<T>;
 
     /**
@@ -94,20 +89,20 @@ export interface EventMatcher<T extends Event = Event> {
      */
     onAny<E extends T>(
         eventDefs: Array<EventDef<InferEventPayload<E>, InferEventKey<E>>>,
-        handler: (event: E) => Event | void | Promise<Event | void>,
+        handler: (event: E) => Event | undefined | Promise<Event | undefined>,
     ): EventMatcher<T>;
 
     /**
      * Fallback handler for unmatched events
      */
     otherwise(
-        handler: (event: T) => Event | void | Promise<Event | void>,
+        handler: (event: T) => Event | undefined | Promise<Event | undefined>,
     ): EventMatcher<T>;
 
     /**
      * Build the matcher function
      */
-    build(): (event: T) => Event | void | Promise<Event | void>;
+    build(): (event: T) => Event | undefined | Promise<Event | undefined>;
 }
 
 /**
@@ -115,7 +110,7 @@ export interface EventMatcher<T extends Event = Event> {
  */
 export type If<C extends boolean, T, F> = C extends true ? T : F;
 
-export type IsVoid<T> = T extends void ? true : false;
+export type IsVoid<T> = [T] extends [undefined] ? true : false;
 
 export type IsPromise<T> = T extends Promise<unknown> ? true : false;
 
@@ -167,7 +162,7 @@ export type GetByPath<
  */
 export interface EnhancedHandler<
     TEvent extends Event = Event,
-    TReturn = Event | void,
+    TReturn = Event | undefined,
 > {
     /**
      * The event handler function
@@ -218,7 +213,7 @@ export interface HandlerBuilder<TEvent extends Event = Event> {
     /**
      * Build the enhanced handler
      */
-    build<TReturn = Event | void>(
+    build<TReturn = Event | undefined>(
         handler: EventHandler<TEvent, TReturn>,
     ): EnhancedHandler<TEvent, TReturn>;
 }
@@ -233,17 +228,17 @@ export function createEnhancedEvent<P = void, K extends EventType = EventType>(
     const eventDef: EnhancedEventDef<P, K> = {
         type,
 
-        with<T extends P & EventPayloads[K] = P & EventPayloads[K]>(
-            data: T,
-        ): Event<K> {
+        with(data: P & EventPayloads[K]): Event<K> {
             return {
+                id: crypto.randomUUID(),
+                threadId: '',
                 type,
                 data,
                 ts: Date.now(),
             } as Event<K>;
         },
 
-        handler<R = Event | void>(
+        handler<R = Event | undefined>(
             handler: (event: Event<K>) => R | Promise<R>,
         ): EventHandler<Event<K>> {
             return handler as EventHandler<Event<K>>;
@@ -254,7 +249,7 @@ export function createEnhancedEvent<P = void, K extends EventType = EventType>(
             return schema ? schema(event.data) : true;
         },
 
-        include(event: Event<EventType>): event is Event<K> {
+        include(event: Event): event is Event<K> {
             if (event.type !== type) return false;
             return schema ? schema(event.data) : true;
         },
@@ -269,38 +264,46 @@ export function createEnhancedEvent<P = void, K extends EventType = EventType>(
 export function createEventMatcher<T extends Event = Event>(): EventMatcher<T> {
     const handlers = new Map<
         string,
-        (event: T) => Event | void | Promise<Event | void>
+        (event: T) => Event | undefined | Promise<Event | undefined>
     >();
     let fallbackHandler:
-        | ((event: T) => Event | void | Promise<Event | void>)
+        | ((event: T) => Event | undefined | Promise<Event | undefined>)
         | undefined;
 
     const matcher: EventMatcher<T> = {
         on<E extends T>(
             eventDef: EventDef<InferEventPayload<E>, InferEventKey<E>>,
-            handler: (event: E) => Event | void | Promise<Event | void>,
+            handler: (
+                event: E,
+            ) => Event | undefined | Promise<Event | undefined>,
         ) {
             handlers.set(eventDef.type, ((event: T) =>
                 handler(event as unknown as E)) as (
                 event: T,
-            ) => Event | void | Promise<Event | void>);
+            ) => Event | undefined | Promise<Event | undefined>);
             return matcher;
         },
 
         onAny<E extends T>(
             eventDefs: Array<EventDef<InferEventPayload<E>, InferEventKey<E>>>,
-            handler: (event: E) => Event | void | Promise<Event | void>,
+            handler: (
+                event: E,
+            ) => Event | undefined | Promise<Event | undefined>,
         ) {
             for (const eventDef of eventDefs) {
                 handlers.set(eventDef.type, ((event: T) =>
                     handler(event as unknown as E)) as (
                     event: T,
-                ) => Event | void | Promise<Event | void>);
+                ) => Event | undefined | Promise<Event | undefined>);
             }
             return matcher;
         },
 
-        otherwise(handler: (event: T) => Event | void | Promise<Event | void>) {
+        otherwise(
+            handler: (
+                event: T,
+            ) => Event | undefined | Promise<Event | undefined>,
+        ) {
             fallbackHandler = handler;
             return matcher;
         },
@@ -338,7 +341,7 @@ export function createHandler<
         },
 
         tagged(...tags: string[]) {
-            metadata.tags = [...(metadata.tags || []), ...tags];
+            metadata.tags = [...(metadata.tags ?? []), ...tags];
             return builder;
         },
 
@@ -352,7 +355,7 @@ export function createHandler<
             return builder;
         },
 
-        build<TReturn = Event | void>(
+        build<TReturn = Event | undefined>(
             handler: EventHandler<TEvent, TReturn>,
         ): EnhancedHandler<TEvent, TReturn> {
             return {

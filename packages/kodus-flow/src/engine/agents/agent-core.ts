@@ -169,7 +169,7 @@ export abstract class AgentCore<
     protected router?: Router;
 
     // Multi-agent mode (LAZY INITIALIZATION)
-    private _agents?: Map<string, AgentDefinition<unknown, unknown, unknown>>;
+    private _agents?: Map<string, AgentDefinition>;
     private _agentCapabilities?: Map<string, AgentCapability>;
     private _messages?: Map<string, TrackedMessage>;
     private _agentInboxes?: Map<string, TrackedMessage[]>;
@@ -246,10 +246,7 @@ export abstract class AgentCore<
     // === LAZY INITIALIZATION GETTERS ===
     protected get agents() {
         if (!this._agents) {
-            this._agents = new Map<
-                string,
-                AgentDefinition<unknown, unknown, unknown>
-            >();
+            this._agents = new Map<string, AgentDefinition>();
         }
         return this._agents;
     }
@@ -317,7 +314,7 @@ export abstract class AgentCore<
             this.config.agentName = definitionOrConfig.name;
         } else {
             // Multi-agent mode
-            this.config = definitionOrConfig as AgentCoreConfig;
+            this.config = definitionOrConfig;
             if (!this.config.tenantId) {
                 throw new EngineError(
                     'AGENT_ERROR',
@@ -390,12 +387,10 @@ export abstract class AgentCore<
      * Lógica de execução compartilhada - IDÊNTICA para ambos os métodos
      */
     protected async executeAgent(
-        agent:
-            | AgentDefinition<TInput, TOutput, TContent>
-            | AgentDefinition<unknown, unknown, unknown>,
+        agent: AgentDefinition<TInput, TOutput, TContent> | AgentDefinition,
         input: unknown,
         agentExecutionOptions?: AgentExecutionOptions,
-    ): Promise<AgentExecutionResult<unknown>> {
+    ): Promise<AgentExecutionResult> {
         const startTime = Date.now();
         const executionId = IdGenerator.executionId();
         const { correlationId } = agentExecutionOptions || {};
@@ -584,7 +579,7 @@ export abstract class AgentCore<
         executionId?: string,
         duration?: number,
         agentName?: string,
-    ): AgentExecutionResult<unknown> & { timeline?: unknown } {
+    ): AgentExecutionResult & { timeline?: unknown } {
         return {
             success: true,
             data: result.output,
@@ -612,9 +607,7 @@ export abstract class AgentCore<
     }
 
     protected async processAgentThinking(
-        agent:
-            | AgentDefinition<TInput, TOutput, TContent>
-            | AgentDefinition<unknown, unknown, unknown>,
+        agent: AgentDefinition<TInput, TOutput, TContent> | AgentDefinition,
         input: unknown,
         context: AgentContext,
     ): Promise<{
@@ -1056,7 +1049,7 @@ export abstract class AgentCore<
      * Registrar um agente (BÁSICO + AVANÇADO)
      */
     protected registerAgent(
-        agent: AgentDefinition<unknown, unknown, unknown>,
+        agent: AgentDefinition,
         capabilities?: AgentCapability,
     ): void {
         this.agents.set(agent.name, agent);
@@ -1079,7 +1072,7 @@ export abstract class AgentCore<
         });
     }
 
-    protected getActionType(action: AgentAction<unknown>): string {
+    protected getActionType(action: AgentAction): string {
         // Check for explicit type property first (for new parallel tool actions)
         if ('type' in action) {
             return action.type as string;
@@ -1508,7 +1501,7 @@ export abstract class AgentCore<
                           { correlationId },
                       )
                     : await this.toolEngine!.executeCall(
-                          tool.toolName as ToolId,
+                          tool.toolName,
                           tool.arguments,
                       );
                 const duration = Date.now() - toolStartTime;
@@ -2220,7 +2213,7 @@ export abstract class AgentCore<
                     hasSetKernelHandler: 'setKernelHandler' in this.toolEngine,
                 },
             );
-            (this.toolEngine as ToolEngine).setKernelHandler(kernelHandler);
+            this.toolEngine.setKernelHandler(kernelHandler);
         } else {
             this.logger.warn(
                 '🔧 [AGENT] ToolEngine not available for KernelHandler setup',
@@ -2370,9 +2363,7 @@ export abstract class AgentCore<
         return !!this.kernelHandler;
     }
 
-    getAgent(
-        agentName: string,
-    ): AgentDefinition<unknown, unknown, unknown> | undefined {
+    getAgent(agentName: string): AgentDefinition | undefined {
         return this.agents.get(agentName);
     }
 
@@ -4942,9 +4933,7 @@ export abstract class AgentCore<
 // 🏭 FACTORY FUNCTIONS
 // ──────────────────────────────────────────────────────────────────────────────
 
-export function createAgentCore(
-    config: AgentCoreConfig,
-): AgentCore<unknown, unknown, unknown> {
+export function createAgentCore(config: AgentCoreConfig): AgentCore {
     return new (class extends AgentCore {
         // Abstract class implementation
     })(config);

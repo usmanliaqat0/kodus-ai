@@ -283,7 +283,7 @@ export class StreamManager {
         size: number,
         timeoutMs?: number,
         options?: { signal?: AbortSignal },
-    ): EventStream<AnyEvent> {
+    ): EventStream {
         return this.createStream(async function* () {
             let buffer: S[] = [];
             let batchStartTime = Date.now();
@@ -432,7 +432,7 @@ export class StreamManager {
     createCombineLatest<S extends AnyEvent>(
         base: EventStream<S>,
         ...streams: EventStream<S>[]
-    ): EventStream<AnyEvent> {
+    ): EventStream {
         return this.createStream(async function* () {
             const allStreams = [base, ...streams];
             const latest = new Map<number, S>();

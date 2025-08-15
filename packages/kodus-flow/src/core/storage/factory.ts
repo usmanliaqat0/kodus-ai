@@ -114,7 +114,7 @@ export class StorageAdapterFactory {
 
         const collection = (config.options?.collection ?? 'default') as string;
 
-        const adapterKey = `${config.type}_${config.connectionString || 'default'}_${collection}`;
+        const adapterKey = `${config.type}_${config.connectionString ?? 'default'}_${collection}`;
 
         // Check if adapter already exists
         if (this.adapters.has(adapterKey)) {
@@ -123,8 +123,7 @@ export class StorageAdapterFactory {
         }
 
         // Merge with defaults
-        const defaults =
-            STORAGE_DEFAULTS[config.type] || STORAGE_DEFAULTS.memory;
+        const defaults = STORAGE_DEFAULTS[config.type];
         const mergedConfig = {
             ...defaults,
             ...config,
@@ -163,7 +162,9 @@ export class StorageAdapterFactory {
                     break;
 
                 default:
-                    throw new Error(`Unknown storage type: ${config.type}`);
+                    throw new Error(
+                        `Unknown storage type: ${String(config.type)}`,
+                    );
             }
 
             // Initialize adapter
@@ -190,12 +191,12 @@ export class StorageAdapterFactory {
     /**
      * Get cached adapter
      */
-    static getCached<T extends BaseStorage<BaseStorageItem>>(
+    static getCached(
         type: StorageType,
         connectionString?: string,
-    ): T | null {
-        const adapterKey = `${type}_${connectionString || 'default'}`;
-        return (this.adapters.get(adapterKey) as T) || null;
+    ): BaseStorage<BaseStorageItem> | null {
+        const adapterKey = `${type}_${connectionString ?? 'default'}`;
+        return this.adapters.get(adapterKey) ?? null;
     }
 
     /**

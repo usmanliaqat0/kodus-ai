@@ -101,10 +101,7 @@ export class MultiKernelManager {
     private readonly logger: ReturnType<typeof createLogger>;
     private readonly kernels = new Map<string, ManagedKernel>();
     private readonly eventBridges = new Map<string, CrossKernelBridge>();
-    private readonly handlers = new Map<
-        string,
-        Map<EventType, EventHandler<AnyEvent>>
-    >();
+    private readonly handlers = new Map<string, Map<EventType, EventHandler>>();
     private readonly crossKernelEventLog: Array<{
         timestamp: number;
         from: string;
@@ -208,8 +205,7 @@ export class MultiKernelManager {
                           // Aumentar timeout de operações longas (ex.: processEvents)
                           operationTimeout: spec.runtimeConfig?.ackTimeout
                               ? Math.max(
-                                    (spec.runtimeConfig.ackTimeout as number) *
-                                        2,
+                                    spec.runtimeConfig.ackTimeout * 2,
                                     60000,
                                 )
                               : 120000,
@@ -312,7 +308,7 @@ export class MultiKernelManager {
                 // Send event to target kernel
                 if (targetKernel.instance) {
                     await targetKernel.instance.emitEventAsync(
-                        targetEvent.type as EventType,
+                        targetEvent.type,
                         targetEvent.data,
                         {
                             correlationId: event.metadata?.correlationId,
@@ -496,7 +492,7 @@ export class MultiKernelManager {
     registerHandler(
         kernelId: string,
         eventType: EventType,
-        handler: EventHandler<AnyEvent>,
+        handler: EventHandler,
     ): void {
         const managedKernel = this.kernels.get(kernelId);
         if (!managedKernel?.instance) {

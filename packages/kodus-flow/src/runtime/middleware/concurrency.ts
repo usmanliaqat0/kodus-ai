@@ -33,7 +33,9 @@ class ConcurrencyManager {
     async acquire(key: string, max: number, timeout = 0): Promise<() => void> {
         if (this.getCurrentCount(key) < max) {
             this.active.set(key, this.getCurrentCount(key) + 1);
-            return () => this.release(key);
+            return () => {
+                this.release(key);
+            };
         }
 
         if (!timeout) throw new Error('CONCURRENCY_DROP');
@@ -43,7 +45,9 @@ class ConcurrencyManager {
             const continuation = () => {
                 /* ocupa o slot e entrega o liberador */
                 this.active.set(key, this.getCurrentCount(key) + 1);
-                resolve(() => this.release(key));
+                resolve(() => {
+                    this.release(key);
+                });
             };
             queue.push(continuation);
             this.queues.set(key, queue);
@@ -53,7 +57,7 @@ class ConcurrencyManager {
                 if (idx !== -1) queue.splice(idx, 1);
                 reject(new Error('CONCURRENCY_TIMEOUT'));
             }, timeout);
-            if ('unref' in tid) (tid as NodeJS.Timeout).unref();
+            if ('unref' in tid) tid.unref();
         });
     }
 
@@ -108,7 +112,7 @@ export function withConcurrency(opts: Partial<ConcurrencyOptions> = {}) {
         };
 
         return withConcurrencyWrapped;
-    } as Middleware<Event>;
+    } as Middleware;
 
     middleware.kind = 'pipeline';
     (middleware as unknown as { displayName?: string }).displayName =

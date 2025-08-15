@@ -63,7 +63,7 @@ export const enhancedValidationSchema = z.object({
     // ✅ z.preprocess() para limpeza automática
     email: z.preprocess(
         (val) => (typeof val === 'string' ? val.toLowerCase().trim() : val),
-        z.string().email(),
+        z.email(),
     ),
 
     // ✅ z.transform() para conversão automática
@@ -91,7 +91,7 @@ export const customValidationSchema = z
             // ✅ Validação customizada mais performática
             return (
                 data.input !== undefined ||
-                Object.keys(data.options || {}).length > 0
+                Object.keys(data.options ?? {}).length > 0
             );
         },
         {
@@ -301,12 +301,12 @@ export function combineValidationResults(
  * Creates a safe ID by validating and converting to branded type
  */
 export function createToolId(id: string): ToolId | null {
-    return validateToolId(id) ? (id as ToolId) : null;
+    return validateToolId(id) ? id : null;
 }
 
 /**
  * Creates a safe AgentId by validating and converting to branded type
  */
 export function createAgentId(id: string): AgentId | null {
-    return validateAgentId(id) ? (id as AgentId) : null;
+    return validateAgentId(id) ? id : null;
 }

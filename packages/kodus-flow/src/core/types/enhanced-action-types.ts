@@ -473,8 +473,8 @@ export function createToolCallAction(
     return { type: 'tool_call', toolName, input };
 }
 
-export function createFinalAnswerAction<T>(
-    content: T,
+export function createFinalAnswerAction(
+    content: unknown,
 ): Extract<AgentAction, { type: 'final_answer' }> {
     return { type: 'final_answer', content };
 }

@@ -52,7 +52,7 @@ export class MemoryManager {
         };
 
         this.vectorStore = new VectorStore(
-            this.options.vectorStoreOptions || {
+            this.options.vectorStoreOptions ?? {
                 dimensions: 1536,
                 distanceMetric: 'cosine',
                 storage: { type: 'memory' },
@@ -81,7 +81,7 @@ export class MemoryManager {
     ): Promise<void> {
         try {
             // Create primary adapter
-            const adapterType = options.adapterType || 'memory';
+            const adapterType = options.adapterType ?? 'memory';
             const adapterConfig = {
                 adapterType,
                 connectionString: options.adapterConfig?.connectionString,
@@ -92,10 +92,10 @@ export class MemoryManager {
 
             this.primaryAdapter = new StorageMemoryAdapter({
                 adapterType: adapterType,
-                connectionString: adapterConfig?.connectionString,
-                options: adapterConfig?.options,
-                timeout: adapterConfig?.timeout || 10000,
-                retries: adapterConfig?.retries || 3,
+                connectionString: adapterConfig.connectionString,
+                options: adapterConfig.options,
+                timeout: adapterConfig.timeout || 10000,
+                retries: adapterConfig.retries || 3,
             });
 
             // Create backup adapter if specified
@@ -131,7 +131,7 @@ export class MemoryManager {
                         error instanceof Error
                             ? error.message
                             : 'Unknown error',
-                    adapterType: options.adapterType || 'memory',
+                    adapterType: options.adapterType ?? 'memory',
                     connectionString: options.adapterConfig?.connectionString
                         ? '[CONFIGURED]'
                         : '[NOT SET]',
@@ -201,7 +201,7 @@ export class MemoryManager {
 
         const item: MemoryItem = {
             id,
-            key: input.key || 'default',
+            key: input.key ?? 'default',
             value: input.content,
             type: input.type,
             timestamp,
@@ -319,8 +319,8 @@ export class MemoryManager {
         if (query.text) {
             results = results.filter((item) => {
                 const content = String(item.value).toLowerCase();
-                const searchText = query.text!.toLowerCase();
-                return content.includes(searchText);
+                const searchText = query.text?.toLowerCase();
+                return content.includes(searchText ?? '');
             });
         }
 
@@ -337,13 +337,13 @@ export class MemoryManager {
         await this.ensureInitialized();
 
         // First, vectorize the query text
-        const queryVector = await this.vectorizeText(query);
+        const queryVector = this.vectorizeText(query);
 
         const vectorQuery: MemoryVectorQuery = {
             vector: queryVector,
             text: query,
-            topK: options.topK || 10,
-            minScore: options.minScore || 0.7,
+            topK: options.topK ?? 10,
+            minScore: options.minScore ?? 0.7,
             filter: options.filter,
         };
 
@@ -353,7 +353,7 @@ export class MemoryManager {
         logger.debug('Semantic search completed', {
             query,
             resultsCount: results.length,
-            topScore: results[0]?.score || 0,
+            topScore: results[0]?.score ?? 0,
         });
 
         return results;
@@ -512,7 +512,7 @@ export class MemoryManager {
      */
     private async vectorizeItem(item: MemoryItem): Promise<void> {
         if (typeof item.value === 'string') {
-            const vector = await this.vectorizeText(item.value);
+            const vector = this.vectorizeText(item.value);
             await this.vectorStore.store({
                 id: item.id,
                 vector,
@@ -530,11 +530,11 @@ export class MemoryManager {
     /**
      * Vectorize text content
      */
-    private async vectorizeText(text: string): Promise<number[]> {
+    private vectorizeText(text: string): number[] {
         // Simple hash-based vectorization for now
         // In production, use proper embedding service
         const hash = this.simpleHash(text);
-        const vector = new Array(1536).fill(0);
+        const vector = new Array(1536).fill(0) as number[];
 
         for (let i = 0; i < Math.min(text.length, 1536); i++) {
             vector[i] = ((text.charCodeAt(i) + hash) % 1000) / 1000;
@@ -566,9 +566,7 @@ let globalMemoryManager: MemoryManager | null = null;
  * Get global memory manager instance
  */
 export function getGlobalMemoryManager(): MemoryManager {
-    if (!globalMemoryManager) {
-        globalMemoryManager = new MemoryManager();
-    }
+    globalMemoryManager ??= new MemoryManager();
     return globalMemoryManager;
 }
 

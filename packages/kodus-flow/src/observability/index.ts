@@ -438,7 +438,7 @@ export class ObservabilitySystem implements ObservabilityInterface {
             ? { ...this.currentContext, ...context }
             : this.currentContext;
         if (execContext) {
-            this.setContext(execContext as ObservabilityContext);
+            this.setContext(execContext);
         }
 
         // Start telemetry span

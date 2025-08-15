@@ -914,14 +914,20 @@ export function createDebugContext(debugSystem?: DebugSystem): DebugContext {
     const debug = debugSystem || getGlobalDebugSystem();
 
     return {
-        setCorrelationId: (id: string) => debug.setCorrelationId(id),
-        clearCorrelationId: () => debug.clearCorrelationId(),
+        setCorrelationId: (id: string) => {
+            debug.setCorrelationId(id);
+        },
+        clearCorrelationId: () => {
+            debug.clearCorrelationId();
+        },
 
         log: (
             level: LogLevel,
             message: string,
             data?: Record<string, unknown>,
-        ) => debug.log(level, 'general', message, data),
+        ) => {
+            debug.log(level, 'general', message, data);
+        },
         trace: (event: Event, source?: string) =>
             debug.traceEvent(event, source),
 

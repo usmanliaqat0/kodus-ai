@@ -169,7 +169,9 @@ class InMemoryTracer implements Tracer {
             kind: options?.kind || 'internal',
             startTime: options?.startTime || Date.now(),
             attributes: options?.attributes || {},
-            onEnd: (span) => this.onSpanEnd(span),
+            onEnd: (span) => {
+                this.onSpanEnd(span);
+            },
         });
 
         this.activeSpans.set(spanId, span);

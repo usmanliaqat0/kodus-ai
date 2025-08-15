@@ -22,7 +22,7 @@ export type LoggerConfig = z.infer<typeof loggerConfigSchema>;
  * Log entry schema and type
  */
 export const logEntrySchema = z.object({
-    timestamp: z.string().datetime(),
+    timestamp: z.iso.datetime(),
     level: logLevelSchema,
     message: z.string(),
     context: z.record(z.string(), z.unknown()).optional(),
@@ -48,7 +48,7 @@ export interface ILogger {
     warn(message: string, data?: Record<string, unknown>): void;
     error(
         message: string,
-        error?: Error | unknown,
+        error?: unknown,
         data?: Record<string, unknown>,
     ): void;
     withContext(context: Record<string, unknown>): ILogger;

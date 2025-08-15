@@ -24,8 +24,7 @@ export interface ObservabilityOptions {
  * Middleware que cria um span por processamento de evento e registra erros
  */
 export const withObservability: MiddlewareFactoryType<
-    ObservabilityOptions | undefined,
-    Event
+    ObservabilityOptions | undefined
 > = (options: ObservabilityOptions | undefined) => {
     const namePrefix = options?.namePrefix ?? 'event.process';
     const include = options?.includeEventTypes?.length
@@ -88,7 +87,7 @@ export const withObservability: MiddlewareFactoryType<
                 throw error;
             }
         };
-    }) as Middleware<Event>;
+    }) as Middleware;
 
     middleware.kind = 'handler';
     // Avoid assigning to Function.name (read-only). Use displayName instead.

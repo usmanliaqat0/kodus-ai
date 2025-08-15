@@ -170,7 +170,7 @@ export class AgentLifecycleHandler {
         // Create or update registry entry
         const entry: AgentRegistryEntry = {
             agentName,
-            tenantId: tenantId as TenantId,
+            tenantId: tenantId,
             status: 'starting',
             startedAt: Date.now(),
             config,
@@ -181,8 +181,7 @@ export class AgentLifecycleHandler {
 
         try {
             // KernelHandler integration - funcionalidades migradas do ExecutionEngine
-            entry.executionId =
-                `lifecycle-${agentName}-${Date.now()}` as ExecutionId;
+            entry.executionId = `lifecycle-${agentName}-${Date.now()}`;
 
             // Transition to running
             await this.transitionStatus(agentKey, 'running');
@@ -196,7 +195,7 @@ export class AgentLifecycleHandler {
             return agentLifecycleEvents.started({
                 agentName,
                 tenantId,
-                executionId: entry.executionId!,
+                executionId: entry.executionId,
                 status: 'running',
                 startedAt: entry.startedAt!,
             });
@@ -444,7 +443,7 @@ export class AgentLifecycleHandler {
         // Create or update registry entry
         const entry: AgentRegistryEntry = this.agents.get(agentKey) || {
             agentName,
-            tenantId: tenantId as TenantId,
+            tenantId: tenantId,
             status: 'stopped',
         };
 

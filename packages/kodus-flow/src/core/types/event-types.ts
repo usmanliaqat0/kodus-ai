@@ -56,7 +56,7 @@ export type EventPayload = z.infer<typeof eventPayloadSchema>;
 // ✅ Zod v4: Schema de evento otimizado para performance
 export const eventSchema = z
     .object({
-        id: z.string().uuid(),
+        id: z.uuid(),
         type: eventTypeSchema,
         timestamp: z.number().positive(),
         payload: eventPayloadSchema.optional(),
@@ -225,7 +225,7 @@ export const isEventHandler = (value: unknown): value is EventHandler => {
 export const eventBatchSchema = z
     .object({
         events: z.array(eventSchema).min(1).max(1000),
-        batchId: z.string().uuid(),
+        batchId: z.uuid(),
         timestamp: z.number().positive(),
         metadata: z.record(z.string(), z.unknown()).optional(),
     })

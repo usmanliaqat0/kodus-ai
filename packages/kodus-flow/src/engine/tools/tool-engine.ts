@@ -46,7 +46,7 @@ import {
  */
 export class ToolEngine {
     private logger: ReturnType<typeof createLogger>;
-    private tools = new Map<ToolId, ToolDefinition<unknown, unknown>>();
+    private tools = new Map<ToolId, ToolDefinition>();
     private config: ToolEngineConfig;
     private kernelHandler?: MultiKernelHandler;
     private router?: Router;
@@ -71,10 +71,7 @@ export class ToolEngine {
     registerTool<TInput = unknown, TOutput = unknown>(
         tool: ToolDefinition<TInput, TOutput>,
     ): void {
-        this.tools.set(
-            tool.name as ToolId,
-            tool as ToolDefinition<unknown, unknown>,
-        );
+        this.tools.set(tool.name, tool as ToolDefinition);
         this.logger.info('Tool registered', {
             toolName: tool.name,
         });
@@ -353,7 +350,7 @@ export class ToolEngine {
      * Convert tool to planner format - SIMPLIFIED
      */
     private convertToolToPlannerFormat(
-        tool: ToolDefinition<unknown, unknown>,
+        tool: ToolDefinition,
     ): ToolMetadataForPlanner {
         let inputParameters: Record<string, unknown>;
         let outputParameters: Record<string, unknown>;
@@ -451,9 +448,7 @@ export class ToolEngine {
     /**
      * Convert tool to LLM format - SIMPLIFIED
      */
-    private convertToolToLLMFormat(
-        tool: ToolDefinition<unknown, unknown>,
-    ): ToolMetadataForLLM {
+    private convertToolToLLMFormat(tool: ToolDefinition): ToolMetadataForLLM {
         let parameters: Record<string, unknown>;
 
         if (tool.inputJsonSchema) {
@@ -530,7 +525,7 @@ export class ToolEngine {
     getTool<TInput = unknown, TOutput = unknown>(
         name: string,
     ): ToolDefinition<TInput, TOutput> | undefined {
-        return this.tools.get(name as ToolId) as
+        return this.tools.get(name) as
             | ToolDefinition<TInput, TOutput>
             | undefined;
     }
@@ -538,7 +533,7 @@ export class ToolEngine {
     /**
      * List all tools (for testing compatibility)
      */
-    listTools(): ToolDefinition<unknown, unknown>[] {
+    listTools(): ToolDefinition[] {
         return Array.from(this.tools.values());
     }
 
@@ -782,7 +777,7 @@ export class ToolEngine {
                     const executionPromise = this.executeToolInternal<
                         TInput,
                         TOutput
-                    >(toolName as ToolId, input, callId);
+                    >(toolName, input, callId);
 
                     // Race between execution and timeout
                     const res = await Promise.race([
@@ -1539,7 +1534,7 @@ export class ToolEngine {
                 const batchPromises = batch.map(async (toolCall) => {
                     try {
                         const result = await this.executeCall<unknown, TOutput>(
-                            toolCall.toolName as ToolId,
+                            toolCall.toolName,
                             toolCall.arguments,
                         );
                         return { toolName: toolCall.toolName, result };
@@ -1564,15 +1559,13 @@ export class ToolEngine {
 
                 // Execute batch with timeout
                 const timeoutPromise = new Promise<never>((_, reject) => {
-                    setTimeout(
-                        () =>
-                            reject(
-                                new Error(
-                                    `Parallel execution timeout after ${timeout}ms`,
-                                ),
+                    setTimeout(() => {
+                        reject(
+                            new Error(
+                                `Parallel execution timeout after ${timeout}ms`,
                             ),
-                        timeout,
-                    );
+                        );
+                    }, timeout);
                 });
 
                 const batchResults = await Promise.race([
@@ -1654,7 +1647,7 @@ export class ToolEngine {
                             : toolCall.arguments;
 
                     const result = await this.executeCall<unknown, TOutput>(
-                        toolCall.toolName as ToolId,
+                        toolCall.toolName,
                         input,
                     );
 
@@ -1791,10 +1784,7 @@ export class ToolEngine {
                                 const result = await this.executeCall<
                                     unknown,
                                     TOutput
-                                >(
-                                    toolCall.toolName as ToolId,
-                                    toolCall.arguments,
-                                );
+                                >(toolCall.toolName, toolCall.arguments);
                                 return { toolName: toolCall.toolName, result };
                             } catch (error) {
                                 const errorMessage =
@@ -1818,7 +1808,7 @@ export class ToolEngine {
                             const result = await this.executeCall<
                                 unknown,
                                 TOutput
-                            >(toolCall.toolName as ToolId, toolCall.arguments);
+                            >(toolCall.toolName, toolCall.arguments);
                             results.push({
                                 toolName: toolCall.toolName,
                                 result,

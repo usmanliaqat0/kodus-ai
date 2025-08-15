@@ -1,12 +1,3 @@
-/**
- * 🎯 SHARED PLANNING TYPES
- *
- * Simple shared types to eliminate conflicts between planning files.
- * Contains only what's needed to fix the current type conflicts.
- */
-
-import type { AgentAction } from './agent-types.js';
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // 🎯 CORE SHARED TYPES (resolves conflicts)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -215,7 +206,7 @@ export interface ReplanContext {
 /**
  * Check if action is execute_plan
  */
-export function isExecutePlanAction(action: AgentAction | unknown): boolean {
+export function isExecutePlanAction(action: unknown): boolean {
     return (
         typeof action === 'object' &&
         action !== null &&

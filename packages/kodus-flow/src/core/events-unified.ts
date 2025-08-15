@@ -207,7 +207,7 @@ export class UnifiedEventManager extends EventEmitter {
 
             // Emit request
             void this.emitEvent(
-                requestEventType as EventType,
+                requestEventType,
                 {
                     data,
                     timestamp: Date.now(),
@@ -229,7 +229,7 @@ export class UnifiedEventManager extends EventEmitter {
         error?: string,
     ): void {
         void this.emitEvent(
-            responseEventType as EventType,
+            responseEventType,
             {
                 data,
                 error,

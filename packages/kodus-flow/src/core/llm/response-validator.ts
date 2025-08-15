@@ -287,10 +287,10 @@ function extractContent(response: unknown): string {
                     );
                 }
                 return false;
-            });
+            }) as Record<string, unknown> | undefined;
 
             if (textBlock) {
-                const textObj = textBlock as Record<string, unknown>;
+                const textObj = textBlock;
                 return textObj.text as string;
             }
 
@@ -300,12 +300,17 @@ function extractContent(response: unknown): string {
                     if (typeof block === 'string') return block;
                     if (typeof block === 'object' && block !== null) {
                         const blockObj = block as Record<string, unknown>;
-                        if (blockObj.text) return blockObj.text;
-                        if (blockObj.reasoning) return blockObj.reasoning;
+                        if (typeof blockObj.text === 'string')
+                            return blockObj.text;
+                        if (typeof blockObj.reasoning === 'string')
+                            return blockObj.reasoning;
                     }
                     return '';
                 })
-                .filter(Boolean)
+                .filter(
+                    (val): val is string =>
+                        typeof val === 'string' && val.length > 0,
+                )
                 .join('\n');
         }
 
@@ -440,7 +445,7 @@ export function validatePlanningResponse(response: unknown): PlanningResult {
             const validData = planData as unknown as PlanningResult;
             logger.debug('Planning response validated successfully', {
                 strategy: validData.strategy,
-                stepsCount: validData.steps?.length || 0,
+                stepsCount: validData.steps.length || 0,
             });
             return validData;
         }
@@ -459,14 +464,15 @@ export function validatePlanningResponse(response: unknown): PlanningResult {
         // Attempt to recover with defaults
         const planDataRecord = planData as Record<string, unknown>;
         const recovered: PlanningResult = {
-            strategy: (planDataRecord?.strategy as string) || 'unknown',
-            goal: (planDataRecord?.goal as string) || 'Unknown goal',
+            strategy:
+                (planDataRecord.strategy as string | undefined) ?? 'unknown',
+            goal: (planDataRecord.goal as string | undefined) ?? 'Unknown goal',
             steps:
-                (planDataRecord?.steps as PlanningResult['steps']) ||
-                (planDataRecord?.plan as PlanningResult['steps']) ||
+                (planDataRecord.steps as PlanningResult['steps'] | undefined) ??
+                (planDataRecord.plan as PlanningResult['steps'] | undefined) ??
                 [],
             reasoning:
-                (planDataRecord?.reasoning as string) ||
+                (planDataRecord.reasoning as string | undefined) ??
                 'No reasoning provided',
         };
 
@@ -591,8 +597,8 @@ export function getValidationErrors(validator: {
     if (!validator.errors) return [];
 
     return validator.errors.map((err) => {
-        const path = err.instancePath || 'root';
-        const message = err.message || 'Unknown error';
+        const path = err.instancePath ?? 'root';
+        const message = err.message ?? 'Unknown error';
         return `${path}: ${message}`;
     });
 }

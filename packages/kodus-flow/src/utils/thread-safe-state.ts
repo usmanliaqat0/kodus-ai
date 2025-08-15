@@ -8,9 +8,9 @@ import { createLogger } from '../observability/index.js';
 /**
  * Thread-safe state manager interface
  */
-export interface StateManager {
-    get<T = unknown>(namespace: string, key: string): Promise<T | undefined>;
-    set(namespace: string, key: string, value: unknown): Promise<void>;
+export interface StateManager<T> {
+    get(namespace: string, key: string): Promise<T | undefined>;
+    set(namespace: string, key: string, value: T): Promise<void>;
     delete(namespace: string, key: string): Promise<boolean>;
     clear(namespace?: string): Promise<void>;
     has(namespace: string, key: string): Promise<boolean>;
@@ -21,8 +21,8 @@ export interface StateManager {
 /**
  * Thread-safe state manager using async locks
  */
-export class ConcurrentStateManager implements StateManager {
-    private readonly states = new Map<string, Map<string, unknown>>();
+export class ConcurrentStateManager<T> implements StateManager<T> {
+    private readonly states = new Map<string, Map<string, T>>();
     private readonly locks = new Map<string, Promise<void>>();
     private readonly logger = createLogger('state-manager');
 
@@ -39,9 +39,9 @@ export class ConcurrentStateManager implements StateManager {
             gcInterval?: number; // Garbage collection interval in ms
         } = {},
     ) {
-        this.maxNamespaces = options.maxNamespaces || 1000;
-        this.maxKeysPerNamespace = options.maxKeysPerNamespace || 10000;
-        this.gcInterval = options.gcInterval || 300000; // 5 minutes
+        this.maxNamespaces = options.maxNamespaces ?? 1000;
+        this.maxKeysPerNamespace = options.maxKeysPerNamespace ?? 10000;
+        this.gcInterval = options.gcInterval ?? 300000; // 5 minutes
 
         // Start garbage collection
         this.startGarbageCollection();
@@ -50,14 +50,11 @@ export class ConcurrentStateManager implements StateManager {
     /**
      * Get value from state
      */
-    async get<T = unknown>(
-        namespace: string,
-        key: string,
-    ): Promise<T | undefined> {
+    async get(namespace: string, key: string): Promise<T | undefined> {
         await this.acquireLock(namespace);
         try {
             const namespaceMap = this.states.get(namespace);
-            return namespaceMap?.get(key) as T | undefined;
+            return namespaceMap?.get(key);
         } finally {
             this.releaseLock(namespace);
         }
@@ -66,7 +63,7 @@ export class ConcurrentStateManager implements StateManager {
     /**
      * Set value in state
      */
-    async set(namespace: string, key: string, value: unknown): Promise<void> {
+    async set(namespace: string, key: string, value: T): Promise<void> {
         await this.acquireLock(namespace);
         try {
             // Check namespace limit
@@ -75,7 +72,7 @@ export class ConcurrentStateManager implements StateManager {
                 this.states.size >= this.maxNamespaces
             ) {
                 throw new StateManagerError(
-                    `Maximum namespaces limit reached: ${this.maxNamespaces}`,
+                    `Maximum namespaces limit reached: ${this.maxNamespaces.toString()}`,
                 );
             }
 
@@ -92,7 +89,7 @@ export class ConcurrentStateManager implements StateManager {
                 namespaceMap.size >= this.maxKeysPerNamespace
             ) {
                 throw new StateManagerError(
-                    `Maximum keys per namespace limit reached: ${this.maxKeysPerNamespace}`,
+                    `Maximum keys per namespace limit reached: ${this.maxKeysPerNamespace.toString()}`,
                 );
             }
 
@@ -156,7 +153,9 @@ export class ConcurrentStateManager implements StateManager {
                 this.states.clear();
                 this.logger.debug('All state cleared');
             } finally {
-                namespaces.forEach((ns) => this.releaseLock(ns));
+                namespaces.forEach((ns) => {
+                    this.releaseLock(ns);
+                });
             }
         }
     }
@@ -167,7 +166,7 @@ export class ConcurrentStateManager implements StateManager {
     async has(namespace: string, key: string): Promise<boolean> {
         await this.acquireLock(namespace);
         try {
-            return this.states.get(namespace)?.has(key) || false;
+            return this.states.get(namespace)?.has(key) ?? false;
         } finally {
             this.releaseLock(namespace);
         }
@@ -193,7 +192,7 @@ export class ConcurrentStateManager implements StateManager {
         if (namespace) {
             await this.acquireLock(namespace);
             try {
-                return this.states.get(namespace)?.size || 0;
+                return this.states.get(namespace)?.size ?? 0;
             } finally {
                 this.releaseLock(namespace);
             }
@@ -208,7 +207,9 @@ export class ConcurrentStateManager implements StateManager {
                 }
                 return total;
             } finally {
-                namespaces.forEach((ns) => this.releaseLock(ns));
+                namespaces.forEach((ns) => {
+                    this.releaseLock(ns);
+                });
             }
         }
     }
@@ -239,7 +240,9 @@ export class ConcurrentStateManager implements StateManager {
 
             return stats;
         } finally {
-            namespaces.forEach((ns) => this.releaseLock(ns));
+            namespaces.forEach((ns) => {
+                this.releaseLock(ns);
+            });
         }
     }
 
@@ -281,7 +284,7 @@ export class ConcurrentStateManager implements StateManager {
      */
     private startGarbageCollection(): void {
         this.gcTimer = setInterval(() => {
-            this.performGarbageCollection().catch((error) => {
+            this.performGarbageCollection().catch((error: unknown) => {
                 this.logger.error('Garbage collection failed', error as Error);
             });
         }, this.gcInterval);
@@ -410,62 +413,63 @@ export class StateManagerError extends Error {
 /**
  * Simple in-memory state manager for single-threaded environments
  */
-export class SimpleStateManager implements StateManager {
-    private readonly states = new Map<string, Map<string, unknown>>();
+export class SimpleStateManager<T> implements StateManager<T> {
+    private readonly states = new Map<string, Map<string, T>>();
 
-    async get<T = unknown>(
-        namespace: string,
-        key: string,
-    ): Promise<T | undefined> {
-        return this.states.get(namespace)?.get(key) as T | undefined;
+    get(namespace: string, key: string): Promise<T | undefined> {
+        return Promise.resolve(this.states.get(namespace)?.get(key));
     }
 
-    async set(namespace: string, key: string, value: unknown): Promise<void> {
+    set(namespace: string, key: string, value: T): Promise<void> {
         let namespaceMap = this.states.get(namespace);
         if (!namespaceMap) {
             namespaceMap = new Map();
             this.states.set(namespace, namespaceMap);
         }
         namespaceMap.set(key, value);
+        return Promise.resolve();
     }
 
-    async delete(namespace: string, key: string): Promise<boolean> {
+    delete(namespace: string, key: string): Promise<boolean> {
         const namespaceMap = this.states.get(namespace);
-        if (!namespaceMap) return false;
+        if (!namespaceMap) return Promise.resolve(false);
 
         const deleted = namespaceMap.delete(key);
         if (namespaceMap.size === 0) {
             this.states.delete(namespace);
         }
-        return deleted;
+        return Promise.resolve(deleted);
     }
 
-    async clear(namespace?: string): Promise<void> {
+    clear(namespace?: string): Promise<void> {
         if (namespace) {
             this.states.delete(namespace);
         } else {
             this.states.clear();
         }
+        return Promise.resolve();
     }
 
-    async has(namespace: string, key: string): Promise<boolean> {
-        return this.states.get(namespace)?.has(key) || false;
+    has(namespace: string, key: string): Promise<boolean> {
+        return Promise.resolve(this.states.get(namespace)?.has(key) ?? false);
     }
 
-    async keys(namespace: string): Promise<string[]> {
+    keys(namespace: string): Promise<string[]> {
         const namespaceMap = this.states.get(namespace);
-        return namespaceMap ? Array.from(namespaceMap.keys()) : [];
+        return Promise.resolve(
+            namespaceMap ? Array.from(namespaceMap.keys()) : [],
+        );
     }
 
-    async size(namespace?: string): Promise<number> {
+    size(namespace?: string): Promise<number> {
         if (namespace) {
-            return this.states.get(namespace)?.size || 0;
+            return Promise.resolve(this.states.get(namespace)?.size ?? 0);
         } else {
             let total = 0;
             for (const namespaceMap of this.states.values()) {
                 total += namespaceMap.size;
             }
-            return total;
+            return Promise.resolve(total);
         }
     }
 }
@@ -474,7 +478,7 @@ export class SimpleStateManager implements StateManager {
  * State manager factory
  */
 export class StateManagerFactory {
-    private static managers = new Map<string, StateManager>();
+    private static managers = new Map<string, StateManager<unknown>>();
 
     /**
      * Create or get state manager
@@ -483,15 +487,16 @@ export class StateManagerFactory {
         name: string,
         type: 'concurrent' | 'simple' = 'concurrent',
         options?: ConstructorParameters<typeof ConcurrentStateManager>[0],
-    ): StateManager {
-        if (!this.managers.has(name)) {
-            const manager =
+    ): StateManager<unknown> {
+        let manager = this.managers.get(name);
+        if (!manager) {
+            manager =
                 type === 'concurrent'
                     ? new ConcurrentStateManager(options)
                     : new SimpleStateManager();
             this.managers.set(name, manager);
         }
-        return this.managers.get(name)!;
+        return manager;
     }
 
     /**
@@ -499,8 +504,12 @@ export class StateManagerFactory {
      */
     static async remove(name: string): Promise<boolean> {
         const manager = this.managers.get(name);
-        if (manager && 'cleanup' in manager) {
-            await (manager as ConcurrentStateManager).cleanup();
+        if (
+            manager &&
+            'cleanup' in manager &&
+            typeof manager.cleanup === 'function'
+        ) {
+            await manager.cleanup();
         }
         return this.managers.delete(name);
     }
@@ -510,8 +519,8 @@ export class StateManagerFactory {
      */
     static async cleanup(): Promise<void> {
         for (const [, manager] of this.managers.entries()) {
-            if ('cleanup' in manager) {
-                await (manager as ConcurrentStateManager).cleanup();
+            if ('cleanup' in manager && typeof manager.cleanup === 'function') {
+                await manager.cleanup();
             }
         }
         this.managers.clear();

@@ -72,13 +72,13 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
         async connect(): Promise<void> {
             // Always reconnect to ensure fresh connections
             if (isConnected) {
-                await this.disconnect();
+                this.disconnect();
             }
 
             const promises = config.servers.map((server) =>
-                registry.register(server).catch((error) => {
+                registry.register(server).catch((error: unknown) => {
                     if (config.onError) {
-                        config.onError(error, server.name);
+                        config.onError(error as Error, server.name);
                     }
                     throw error;
                 }),
@@ -91,7 +91,7 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
         /**
          * Disconnect from all MCP servers
          */
-        async disconnect(): Promise<void> {
+        disconnect(): void {
             if (!isConnected) {
                 return;
             }
@@ -122,10 +122,10 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
             return engineTools.map((tool: EngineTool) => ({
                 name: tool.name,
                 description: tool.description,
-                inputSchema: tool?.inputSchema,
-                outputSchema: tool?.outputSchema,
-                annotations: tool?.annotations,
-                title: tool?.title,
+                inputSchema: tool.inputSchema,
+                outputSchema: tool.outputSchema,
+                annotations: tool.annotations,
+                title: tool.title,
                 execute: async (args: unknown, _ctx: unknown) => {
                     const { serverName, toolName } = parseToolName(tool.name);
 
@@ -158,7 +158,7 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
         /**
          * List all resources from all servers
          */
-        async listResources(): Promise<MCPResourceWithServer[]> {
+        listResources(): MCPResourceWithServer[] {
             if (!isConnected) {
                 throw new Error(
                     'MCP adapter not connected. Call connect() first.',
@@ -172,10 +172,7 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
         /**
          * Read a resource
          */
-        async readResource(
-            _uri: string,
-            _serverName?: string,
-        ): Promise<unknown> {
+        readResource(_uri: string, _serverName?: string): unknown {
             if (!isConnected) {
                 throw new Error(
                     'MCP adapter not connected. Call connect() first.',
@@ -189,7 +186,7 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
         /**
          * List all prompts from all servers
          */
-        async listPrompts(): Promise<MCPPromptWithServer[]> {
+        listPrompts(): MCPPromptWithServer[] {
             if (!isConnected) {
                 throw new Error(
                     'MCP adapter not connected. Call connect() first.',
@@ -203,11 +200,11 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
         /**
          * Get a prompt
          */
-        async getPrompt(
+        getPrompt(
             _name: string,
             _args?: Record<string, string>,
             _serverName?: string,
-        ): Promise<unknown> {
+        ): unknown {
             if (!isConnected) {
                 throw new Error(
                     'MCP adapter not connected. Call connect() first.',
@@ -238,7 +235,7 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
             return registry.executeTool(
                 toolName,
                 args,
-                serverName || parsedServer,
+                serverName ?? parsedServer,
             );
         },
 
@@ -254,7 +251,7 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
             try {
                 await registry.listAllTools();
             } catch {
-                await this.disconnect();
+                this.disconnect();
                 await this.connect();
             }
         },

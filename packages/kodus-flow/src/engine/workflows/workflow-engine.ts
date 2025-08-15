@@ -28,7 +28,7 @@ export interface StepContext {
 // Workflow definition
 export interface WorkflowDefinition {
     readonly name: string;
-    readonly steps: ReadonlyArray<Step<unknown, unknown>>;
+    readonly steps: ReadonlyArray<Step>;
     readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
@@ -288,7 +288,7 @@ export class WorkflowEngine {
 
 // Builder API
 export class WorkflowBuilder {
-    private steps: Step<unknown, unknown>[] = [];
+    private steps: Step[] = [];
 
     constructor(private name: string) {}
 
@@ -296,7 +296,7 @@ export class WorkflowBuilder {
         name: string,
         handler: (input: TStepInput, ctx: StepContext) => Promise<TStepOutput>,
     ): this {
-        const typedStep: Step<unknown, unknown> = {
+        const typedStep: Step = {
             name,
             handler: async (
                 input: unknown,

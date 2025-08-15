@@ -46,7 +46,7 @@ export class ContextBuilder {
     private readonly _config: ContextBuilderConfig;
 
     private memoryManager!: MemoryManager;
-    private sessionService: SessionService;
+    private sessionService: SessionService<unknown>;
     private toolEngine?: ToolEngine;
 
     private constructor(config: ContextBuilderConfig = {}) {
@@ -81,9 +81,7 @@ export class ContextBuilder {
     }
 
     static getInstance(config?: ContextBuilderConfig): ContextBuilder {
-        if (!ContextBuilder.instance) {
-            ContextBuilder.instance = new ContextBuilder(config);
-        }
+        ContextBuilder.instance ??= new ContextBuilder(config);
         return ContextBuilder.instance;
     }
 
@@ -115,7 +113,7 @@ export class ContextBuilder {
         memoryConfig: NonNullable<ContextBuilderConfig['memory']>,
     ): void {
         const memoryManager = new MemoryManager({
-            adapterType: memoryConfig.adapterType || 'memory',
+            adapterType: memoryConfig.adapterType ?? 'memory',
             adapterConfig: memoryConfig.adapterConfig,
         });
 
@@ -123,7 +121,7 @@ export class ContextBuilder {
         this.memoryManager = memoryManager;
 
         this.logger.info('MemoryManager initialized with custom config', {
-            adapterType: memoryConfig.adapterType || 'memory',
+            adapterType: memoryConfig.adapterType ?? 'memory',
             hasConnectionString: !!memoryConfig.adapterConfig?.connectionString,
         });
     }
@@ -133,25 +131,23 @@ export class ContextBuilder {
     ): Promise<AgentContext> {
         this.logger.info('Creating agent context', {
             agentName: options.agentName,
-            threadId: options.thread?.id,
+            threadId: options.thread.id,
             tenantId: options.tenantId,
         });
 
         try {
             await this.memoryManager.initialize();
-            const threadId = options.thread?.id || 'default';
-            const tenantId = options.tenantId || 'default';
+            const threadId = options.thread.id || 'default';
+            const tenantId = options.tenantId ?? 'default';
             let session = await this.sessionService.getSessionByThread(
                 threadId,
                 tenantId,
             );
-            if (!session) {
-                session = await this.sessionService.createSession(
-                    tenantId,
-                    threadId,
-                    {},
-                );
-            }
+            session ??= await this.sessionService.createSession(
+                tenantId,
+                threadId,
+                {},
+            );
 
             const workingMemory = new ContextStateService(
                 { sessionId: session.id },
@@ -186,7 +182,7 @@ export class ContextBuilder {
         options,
     }: {
         session: Session;
-        workingMemory: ContextStateService;
+        workingMemory: ContextStateService<unknown>;
         options: AgentExecutionOptions;
     }): Promise<AgentContext> {
         const invocationId = IdGenerator.executionId();
@@ -200,10 +196,7 @@ export class ContextBuilder {
 
         // Reidratar workingMemory com contexto persistido por sessão (por namespace)
         try {
-            const contextData = (session.contextData || {}) as Record<
-                string,
-                unknown
-            >;
+            const contextData = session.contextData;
             for (const [namespace, nsValue] of Object.entries(contextData)) {
                 if (
                     typeof nsValue === 'object' &&
@@ -240,14 +233,14 @@ export class ContextBuilder {
         return {
             sessionId: session.id,
             tenantId: session.tenantId,
-            correlationId: options.correlationId || IdGenerator.correlationId(),
+            correlationId: options.correlationId ?? IdGenerator.correlationId(),
             thread: options.thread,
             agentName: options.agentName,
             invocationId,
 
             state: {
-                get: <T>(namespace: string, key: string, _threadId?: string) =>
-                    workingMemory.get<T>(namespace, key),
+                get: (namespace: string, key: string, _threadId?: string) =>
+                    workingMemory.get(namespace, key),
                 set: async (
                     namespace: string,
                     key: string,
@@ -261,9 +254,9 @@ export class ContextBuilder {
                     });
                 },
                 clear: (namespace: string) => workingMemory.clear(namespace),
-                getNamespace: async (namespace: string) => {
+                getNamespace: (namespace: string) => {
                     const nsMap = workingMemory.getNamespace(namespace);
-                    return nsMap ? new Map(Object.entries(nsMap)) : undefined;
+                    return new Map(Object.entries(nsMap));
                 },
             },
 
@@ -324,7 +317,7 @@ export class ContextBuilder {
                         },
                     });
                     return results.map(
-                        (r) => r.metadata?.content || r.text || 'No content',
+                        (r) => r.metadata?.content ?? r.text ?? 'No content',
                     );
                 },
                 getRecent: async (limit = 5) => {
@@ -375,7 +368,7 @@ export class ContextBuilder {
                     const currentSession = await this.sessionService.getSession(
                         session.id,
                     );
-                    return currentSession?.conversationHistory || [];
+                    return currentSession?.conversationHistory ?? [];
                 },
                 updateMetadata: async (metadata: Record<string, unknown>) => {
                     await this.sessionService.updateSessionMetadata(
@@ -431,10 +424,13 @@ export class ContextBuilder {
             executionRuntime: {
                 addContextValue: async (update: Record<string, unknown>) => {
                     const contextValues =
-                        (await workingMemory.get<unknown[]>(
-                            'runtime',
-                            'contextValues',
-                        )) || [];
+                        (await workingMemory.get('runtime', 'contextValues')) ??
+                        [];
+
+                    if (!Array.isArray(contextValues)) {
+                        throw new Error('Context values must be an array');
+                    }
+
                     contextValues.push({ ...update, timestamp: Date.now() });
                     await workingMemory.set(
                         'runtime',
@@ -479,7 +475,7 @@ export class ContextBuilder {
             },
             agentIdentity: undefined,
             agentExecutionOptions: options,
-            allTools: this.toolEngine?.listTools() || [],
+            allTools: this.toolEngine?.listTools() ?? [],
 
             stepExecution: sharedStepExecution,
             messageContext: sharedMessageContext,
@@ -491,7 +487,7 @@ export class ContextBuilder {
         this.toolEngine = toolEngine;
         this.logger.info('ToolEngine set for ContextBuilder', {
             hasToolEngine: !!toolEngine,
-            toolCount: toolEngine?.listTools().length || 0,
+            toolCount: toolEngine.listTools().length || 0,
         });
     }
 

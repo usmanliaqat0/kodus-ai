@@ -41,11 +41,11 @@ export class VectorStore {
     /**
      * Store a vector
      */
-    async store(vector: MemoryVector): Promise<void> {
+    store(vector: MemoryVector): void {
         // Validate vector dimensions
         if (vector.vector.length !== this.options.dimensions) {
             throw new Error(
-                `Vector dimensions mismatch: expected ${this.options.dimensions}, got ${vector.vector.length}`,
+                `Vector dimensions mismatch: expected ${this.options.dimensions.toString()}, got ${vector.vector.length.toString()}`,
             );
         }
 
@@ -66,13 +66,11 @@ export class VectorStore {
     /**
      * Search for similar vectors
      */
-    async search(
-        query: MemoryVectorQuery,
-    ): Promise<MemoryVectorSearchResult[]> {
+    search(query: MemoryVectorQuery): MemoryVectorSearchResult[] {
         // Validate query vector dimensions
         if (query.vector.length !== this.options.dimensions) {
             throw new Error(
-                `Query vector dimensions mismatch: expected ${this.options.dimensions}, got ${query.vector.length}`,
+                `Query vector dimensions mismatch: expected ${this.options.dimensions.toString()}, got ${query.vector.length.toString()}`,
             );
         }
 
@@ -111,7 +109,7 @@ export class VectorStore {
 
                 // Apply metadata filters
                 if (query.filter.metadata) {
-                    const vectorMetadata = vector.metadata || {};
+                    const vectorMetadata = vector.metadata ?? {};
                     const shouldSkip = Object.entries(
                         query.filter.metadata,
                     ).some(([key, value]) => vectorMetadata[key] !== value);
@@ -151,7 +149,7 @@ export class VectorStore {
             queryText: query.text,
             totalVectors: this.vectors.size,
             resultsCount: topResults.length,
-            topScore: topResults[0]?.score || 0,
+            topScore: topResults[0]?.score ?? 0,
         });
 
         return topResults;
@@ -160,7 +158,7 @@ export class VectorStore {
     /**
      * Delete a vector
      */
-    async delete(id: string): Promise<boolean> {
+    delete(id: string): boolean {
         const deleted = this.vectors.delete(id);
         if (deleted) {
             logger.debug('Vector deleted', { id });
@@ -171,7 +169,7 @@ export class VectorStore {
     /**
      * Clear all vectors
      */
-    async clear(): Promise<void> {
+    clear(): void {
         this.vectors.clear();
         logger.info('Vector store cleared');
     }
@@ -179,8 +177,8 @@ export class VectorStore {
     /**
      * Get vector by ID
      */
-    async get(id: string): Promise<MemoryVector | null> {
-        return this.vectors.get(id) || null;
+    get(id: string): MemoryVector | null {
+        return this.vectors.get(id) ?? null;
     }
 
     /**
@@ -208,7 +206,7 @@ export class VectorStore {
      * Calculate similarity between two vectors
      */
     private calculateSimilarity(v1: number[], v2: number[]): number {
-        const metric = this.options.distanceMetric || 'cosine';
+        const metric = this.options.distanceMetric ?? 'cosine';
 
         switch (metric) {
             case 'cosine':
@@ -218,7 +216,7 @@ export class VectorStore {
             case 'dot':
                 return this.dotProductSimilarity(v1, v2);
             default:
-                throw new Error(`Unknown distance metric: ${metric}`);
+                throw new Error(`Unknown distance metric: ${String(metric)}`);
         }
     }
 
@@ -304,7 +302,7 @@ export class VectorStore {
         return {
             vectorCount,
             dimensions: this.options.dimensions,
-            distanceMetric: this.options.distanceMetric || 'cosine',
+            distanceMetric: this.options.distanceMetric ?? 'cosine',
             storageType: this.options.storage?.type ?? 'unknown',
             averageVectorMagnitude,
         };

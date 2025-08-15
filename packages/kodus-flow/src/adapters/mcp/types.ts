@@ -223,9 +223,7 @@ export interface HumanApprovalResponse {
 }
 
 export interface HumanApprovalHandler {
-    requestApproval(
-        request: HumanApprovalRequest,
-    ): Promise<HumanApprovalResponse>;
+    requestApproval(request: HumanApprovalRequest): HumanApprovalResponse;
 }
 
 // =============================================================================
@@ -380,18 +378,18 @@ export interface MCPPromptWithServer extends MCPPrompt {
 
 export interface MCPAdapter {
     connect(): Promise<void>;
-    disconnect(): Promise<void>;
+    disconnect(): void;
     ensureConnection(): Promise<void>;
     getTools(): Promise<MCPTool[]>;
     hasTool(name: string): Promise<boolean>;
-    listResources(): Promise<MCPResourceWithServer[]>;
-    readResource(uri: string, serverName?: string): Promise<unknown>;
-    listPrompts(): Promise<MCPPromptWithServer[]>;
+    listResources(): MCPResourceWithServer[];
+    readResource(uri: string, serverName?: string): unknown;
+    listPrompts(): MCPPromptWithServer[];
     getPrompt(
         name: string,
         args?: Record<string, string>,
         serverName?: string,
-    ): Promise<unknown>;
+    ): unknown;
     executeTool(
         name: string,
         args?: Record<string, unknown>,
@@ -469,7 +467,7 @@ export function validateMCPServerConfig(config: MCPServerConfig): boolean {
         return false;
     }
 
-    if (!config.type || !['http', 'sse', 'websocket'].includes(config.type)) {
+    if (!['http', 'sse', 'websocket'].includes(config.type)) {
         return false;
     }
 

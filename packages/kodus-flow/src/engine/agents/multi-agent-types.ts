@@ -202,7 +202,7 @@ export interface TrackedMessage extends AgentMessage {
  * Agente registrado com métricas
  */
 export interface RegisteredAgent {
-    agent: CoordinatableAgent<unknown, unknown>;
+    agent: CoordinatableAgent;
     capabilities: AgentCapability;
     metadata: Record<string, unknown>;
     performance: {

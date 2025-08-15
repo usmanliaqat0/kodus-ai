@@ -113,7 +113,7 @@ export function parseToolResult(result: unknown): ParsedToolResult {
             // Check for MCP format first
             if (isMCPToolResult(result)) {
                 parsingSteps.push('mcp-format');
-                const parsed = parseMCPResult(result as MCPToolResult);
+                const parsed = parseMCPResult(result);
                 source = 'mcp';
                 text = parsed.text;
                 data = parsed.data;
@@ -146,7 +146,7 @@ export function parseToolResult(result: unknown): ParsedToolResult {
         // ▶️ Step 4: Handle other types
         else {
             parsingSteps.push('other-type');
-            text = String(result);
+            text = typeof result === 'string' ? result : JSON.stringify(result);
             contentType = 'text';
             source = 'simple';
         }
@@ -157,7 +157,12 @@ export function parseToolResult(result: unknown): ParsedToolResult {
         });
 
         parsingSteps.push('error-fallback');
-        text = String(result || 'No result');
+        text =
+            typeof result === 'undefined' || result === null
+                ? 'No result'
+                : typeof result === 'string'
+                  ? result
+                  : JSON.stringify(result);
         contentType = 'text';
         source = 'unknown';
     }
@@ -229,10 +234,10 @@ function parseStringResult(str: string): ParsedToolResult {
     let source: ParsedToolResult['metadata']['source'] = 'simple';
 
     try {
-        const parsed = JSON.parse(str);
-        if (typeof parsed === 'object' && parsed !== null) {
+        const parsed = JSON.parse(str) as Record<string, unknown>;
+        if (typeof parsed === 'object') {
             parsingSteps.push('json-parsed');
-            data = parsed as Record<string, unknown>;
+            data = parsed;
             text = extractTextFromData(data);
             contentType = 'json';
             source = 'json-string';
@@ -282,16 +287,16 @@ function parseMCPResult(result: MCPToolResult): {
     let data = result.structuredContent;
     if (!data && text.trim().startsWith('{') && text.trim().endsWith('}')) {
         try {
-            const parsed = JSON.parse(text);
-            if (typeof parsed === 'object' && parsed !== null) {
-                data = parsed as Record<string, unknown>;
+            const parsed = JSON.parse(text) as Record<string, unknown>;
+            if (typeof parsed === 'object') {
+                data = parsed;
             }
         } catch {
             // Not valid JSON, keep as text
         }
     }
 
-    const isError = result.isError || detectError(text, data);
+    const isError = result.isError ?? detectError(text, data);
     const contentType: ParsedToolResult['metadata']['contentType'] = data
         ? 'json'
         : text
@@ -313,10 +318,11 @@ function parseNestedResult(result: unknown): {
 
     try {
         // Navigate the nested structure
-        const resultObj = result as Record<string, unknown>;
+        const resultObj = result as Record<string, unknown> | undefined;
         const nested =
-            resultObj.result ||
-            (resultObj.content as Record<string, unknown>)?.result ||
+            resultObj?.result ??
+            (resultObj?.content as Record<string, unknown> | undefined)
+                ?.result ??
             resultObj;
 
         if (nested && typeof nested === 'object') {
@@ -339,9 +345,9 @@ function parseNestedResult(result: unknown): {
             // If text looks like JSON, try to parse it
             if (text && text.trim().startsWith('{')) {
                 try {
-                    const parsed = JSON.parse(text);
-                    if (typeof parsed === 'object' && parsed !== null) {
-                        data = parsed as Record<string, unknown>;
+                    const parsed = JSON.parse(text) as Record<string, unknown>;
+                    if (typeof parsed === 'object') {
+                        data = parsed;
                         // Extract meaningful text from parsed data
                         text = extractTextFromData(data);
                     }
@@ -415,7 +421,7 @@ function extractTextFromData(data: Record<string, unknown>): string {
             parts.push(`Error: ${error.message}`);
         }
         if (error.code && typeof error.code === 'number') {
-            parts.push(`Code: ${error.code}`);
+            parts.push(`Code: ${error.code.toString()}`);
         }
         return parts.join(' - ');
     }
@@ -431,15 +437,15 @@ function extractTextFromData(data: Record<string, unknown>): string {
 
     for (const field of meaningfulFields) {
         if (data[field] && typeof data[field] === 'string') {
-            parts.push(data[field] as string);
+            parts.push(data[field]);
         }
     }
 
     // Look for arrays with data
     if (data.data && Array.isArray(data.data) && data.data.length > 0) {
-        parts.push(`Found ${data.data.length} items`);
+        parts.push(`Found ${data.data.length.toString()} items`);
     } else if (data.count && typeof data.count === 'number') {
-        parts.push(`Count: ${data.count}`);
+        parts.push(`Count: ${data.count.toString()}`);
     }
 
     // Look for success indicators
@@ -465,7 +471,7 @@ function detectError(text: string, data?: Record<string, unknown>): boolean {
     }
 
     // Check for JSON-RPC error structure
-    if (data?.jsonrpc === '2.0' && data?.error) {
+    if (data?.jsonrpc === '2.0' && data.error) {
         return true;
     }
 

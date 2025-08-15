@@ -167,7 +167,7 @@ export const EVENT_TYPES = {
  * Tipo união extraído das constantes + suporte para tipos dinâmicos
  * Garante que só usamos tipos válidos, mas permite strings literais
  */
-export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES] | string;
+export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
 
 // ============================================================================
 // 3️⃣ PAYLOADS PARA CADA EVENTO
@@ -574,7 +574,7 @@ export interface EventPayloads {
 
     // === STREAM EVENTS ===
     [EVENT_TYPES.STREAM_ERROR]: {
-        originalEvent: Event<EventType>;
+        originalEvent: Event;
         handler: string;
         error: unknown;
         timestamp: number;
@@ -583,13 +583,13 @@ export interface EventPayloads {
     };
 
     [EVENT_TYPES.STREAM_BATCH]: {
-        events: Event<EventType>[];
+        events: Event[];
         size: number;
     };
 
     // === ERROR EVENTS ===
     [EVENT_TYPES.ERROR]: {
-        originalEvent: Event<EventType>;
+        originalEvent: Event;
         handler: string;
         error: unknown;
         timestamp: number;
@@ -657,27 +657,27 @@ export interface EventPayloads {
     };
 
     // === TEST EVENTS ===
-    [EVENT_TYPES.START]: void;
+    [EVENT_TYPES.START]: undefined;
 
     [EVENT_TYPES.BENCHMARK]: {
         id: number;
     };
 
-    [EVENT_TYPES.DONE]: void;
+    [EVENT_TYPES.DONE]: undefined;
 
     [EVENT_TYPES.HIGH_VOLUME]: {
         id: number;
     };
 
-    [EVENT_TYPES.START_LIFECYCLE]: void;
+    [EVENT_TYPES.START_LIFECYCLE]: undefined;
 
     [EVENT_TYPES.PROCESS_LIFECYCLE]: {
         id: number;
     };
 
-    [EVENT_TYPES.STOP_LIFECYCLE]: void;
+    [EVENT_TYPES.STOP_LIFECYCLE]: undefined;
 
-    [EVENT_TYPES.AFTER_STOP_LIFECYCLE]: void;
+    [EVENT_TYPES.AFTER_STOP_LIFECYCLE]: undefined;
 
     // === WORKFLOW ENGINE EVENTS ===
     [EVENT_TYPES.STEP_PREFIX]: {
@@ -741,7 +741,7 @@ export interface Event<K extends EventType = EventType> {
 /**
  * Alias para Event genérico (qualquer tipo de evento)
  */
-export type AnyEvent = Event<EventType>;
+export type AnyEvent = Event;
 
 // ============================================================================
 // 5️⃣ TIPOS ENHANCED (Centralizados aqui)
@@ -849,14 +849,14 @@ export function createEvent<K extends EventType>(
         threadId?: string;
     },
 ): Event<K> {
-    const eventId = options?.id || IdGenerator.callId();
+    const eventId = options?.id ?? IdGenerator.callId();
 
     return {
         id: eventId,
         type,
         data: data as EventPayloads[K],
-        ts: options?.timestamp || Date.now(),
-        threadId: options?.threadId || IdGenerator.callId(),
+        ts: options?.timestamp ?? Date.now(),
+        threadId: options?.threadId ?? IdGenerator.callId(),
     };
 }
 

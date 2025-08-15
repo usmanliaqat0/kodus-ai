@@ -8,10 +8,10 @@ import { safeJsonSchemaToZod } from '../../core/utils/json-schema-to-zod.js';
 export interface EngineTool {
     name: string;
     description: string;
-    inputZodSchema: z.ZodSchema;
+    inputZodSchema: z.ZodType;
     inputSchema: unknown;
     outputSchema?: unknown;
-    outputZodSchema?: z.ZodSchema;
+    outputZodSchema?: z.ZodType;
     annotations?: Record<string, unknown>;
     title?: string;
     execute: (args: unknown, ctx: unknown) => Promise<unknown>;
@@ -49,7 +49,7 @@ export function validateMCPSchema(schema: unknown): boolean {
  * Convert MCP tool to Kodus Flow engine tool with validation
  */
 export function mcpToolToEngineTool(mcpTool: MCPToolRawWithServer): EngineTool {
-    if (!mcpTool || typeof mcpTool !== 'object') {
+    if (typeof mcpTool !== 'object') {
         throw new Error('Invalid MCP tool structure');
     }
 
@@ -88,16 +88,14 @@ export function mcpToolToEngineTool(mcpTool: MCPToolRawWithServer): EngineTool {
     return {
         name: toolName,
         description:
-            mcpTool?.description ||
-            mcpTool?.title ||
-            `MCP Tool: ${mcpTool.name}`,
+            mcpTool.description ?? mcpTool.title ?? `MCP Tool: ${mcpTool.name}`,
         inputZodSchema: zodSchema,
         inputSchema: enhancedJsonSchema,
         outputZodSchema: outputZodSchema,
         outputSchema: enhancedOutputJsonSchema,
         annotations: mcpTool.annotations,
         title: mcpTool.title,
-        execute: async (_args: unknown, _ctx: unknown) => {
+        execute: (_args: unknown, _ctx: unknown) => {
             throw new Error(
                 'Tool execute function not connected to MCP client',
             );
@@ -112,7 +110,7 @@ function enhanceMCPSchema(schema: unknown): unknown {
 
     const enhancedSchema = { ...schema } as Record<string, unknown>;
 
-    if (schema && typeof schema === 'object' && 'annotations' in schema) {
+    if (typeof schema === 'object' && 'annotations' in schema) {
         enhancedSchema.annotations = (
             schema as Record<string, unknown>
         ).annotations;

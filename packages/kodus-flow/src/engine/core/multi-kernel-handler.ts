@@ -549,10 +549,7 @@ export class MultiKernelHandler {
     /**
      * Register event handler on appropriate kernel
      */
-    registerHandler(
-        eventType: EventType,
-        handler: EventHandler<AnyEvent>,
-    ): void {
+    registerHandler(eventType: EventType, handler: EventHandler): void {
         this.ensureInitialized();
 
         // Determine which kernel should handle this event type
@@ -727,8 +724,7 @@ export class MultiKernelHandler {
     async run(startEvent: AnyEvent): Promise<MultiKernelExecutionResult> {
         this.ensureInitialized();
 
-        const execId =
-            `exec_${Date.now()}_${Math.random().toString(36).substring(2, 11)}` as ExecutionId;
+        const execId = `exec_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
         const startTime = Date.now();
         const initialEventCounts = await this.eventCountsMutex.withLock(
             async () => ({
@@ -740,7 +736,7 @@ export class MultiKernelHandler {
 
         try {
             // Emit the start event
-            await this.emit(startEvent.type as EventType, startEvent.data);
+            await this.emit(startEvent.type, startEvent.data);
 
             // Process all events
             await this.processEvents();
@@ -1017,7 +1013,7 @@ export class MultiKernelHandler {
             if (!this.registeredResponseChannels.has(channelKey)) {
                 this.multiKernelManager!.registerHandler(
                     responseKernelId,
-                    responseEventType as EventType,
+                    responseEventType,
                     (event: AnyEvent) => {
                         const eventCorrelationId =
                             event.metadata?.correlationId;
@@ -1041,7 +1037,7 @@ export class MultiKernelHandler {
                                     new Error(
                                         (
                                             event.data as { error?: string }
-                                        ).error!,
+                                        ).error,
                                     ),
                                 );
                             } else {
@@ -1055,14 +1051,18 @@ export class MultiKernelHandler {
 
             // Track pending resolver for this correlationId (cast to unknown to satisfy map type)
             this.pendingResponses.set(correlationId, {
-                resolve: (value: unknown) => resolve(value as TResponse),
-                reject: (error: Error) => reject(error),
+                resolve: (value: unknown) => {
+                    resolve(value as TResponse);
+                },
+                reject: (error: Error) => {
+                    reject(error);
+                },
             });
 
             // ✅ Emitir request via Kernel (ACK/NACK pelo Kernel/Runtime interno)
             kernel
                 .emitEventAsync(
-                    requestEventType as EventType,
+                    requestEventType,
                     {
                         ...data,
                         timestamp: Date.now(),

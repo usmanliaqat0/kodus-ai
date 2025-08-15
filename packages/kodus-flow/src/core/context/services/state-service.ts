@@ -1,19 +1,4 @@
 /**
- * State Service Interface
- */
-
-export interface StateService {
-    get<T = unknown>(key: string): T | undefined;
-    set<T = unknown>(key: string, value: T): void;
-    delete(key: string): boolean;
-    clear(): void;
-    has(key: string): boolean;
-    keys(): string[];
-    values(): unknown[];
-    entries(): Array<[string, unknown]>;
-}
-
-/**
  * State Service Implementation
  *
  * Provides namespaced state management with WeakMap-based isolation
@@ -25,10 +10,10 @@ import type { StateManager } from '../../../utils/thread-safe-state.js';
 /**
  * Context-based state service using WeakMap for automatic cleanup
  */
-export class ContextStateService implements StateManager {
+export class ContextStateService<T> implements StateManager<T> {
     private readonly stateMap = new WeakMap<
         object,
-        Map<string, Map<string, unknown>>
+        Map<string, Map<string, T>>
     >();
     private readonly maxNamespaceSize: number;
     private readonly maxNamespaces: number;
@@ -47,27 +32,27 @@ export class ContextStateService implements StateManager {
     /**
      * Get a value from a specific namespace
      */
-    async get<T>(namespace: string, key: string): Promise<T | undefined> {
+    get(namespace: string, key: string): Promise<T | undefined> {
         const namespaces = this.stateMap.get(this.contextKey);
 
         if (!namespaces) {
-            return undefined;
+            return Promise.resolve(undefined);
         }
 
         const namespaceMap = namespaces.get(namespace);
         if (!namespaceMap) {
-            return undefined;
+            return Promise.resolve(undefined);
         }
 
-        const value = namespaceMap.get(key) as T | undefined;
+        const value = namespaceMap.get(key);
 
-        return value;
+        return Promise.resolve(value);
     }
 
     /**
      * Set a value in a specific namespace
      */
-    async set(namespace: string, key: string, value: unknown): Promise<void> {
+    set(namespace: string, key: string, value: T): Promise<void> {
         // Validate inputs for security
         if (!namespace || typeof namespace !== 'string') {
             throw new Error('Namespace must be a non-empty string');
@@ -90,7 +75,7 @@ export class ContextStateService implements StateManager {
             namespaces.size >= this.maxNamespaces
         ) {
             throw new Error(
-                `Maximum number of namespaces (${this.maxNamespaces}) exceeded`,
+                `Maximum number of namespaces (${this.maxNamespaces.toString()}) exceeded`,
             );
         }
 
@@ -107,40 +92,42 @@ export class ContextStateService implements StateManager {
             namespaceMap.size >= this.maxNamespaceSize
         ) {
             throw new Error(
-                `Maximum namespace size (${this.maxNamespaceSize}) exceeded for namespace '${namespace}'`,
+                `Maximum namespace size (${this.maxNamespaceSize.toString()}) exceeded for namespace '${namespace}'`,
             );
         }
 
         namespaceMap.set(key, value);
+
+        return Promise.resolve();
     }
 
     /**
      * Delete a specific key from a namespace
      */
-    async delete(namespace: string, key: string): Promise<boolean> {
+    delete(namespace: string, key: string): Promise<boolean> {
         const namespaces = this.stateMap.get(this.contextKey);
 
         if (!namespaces) {
-            return false;
+            return Promise.resolve(false);
         }
 
         const namespaceMap = namespaces.get(namespace);
 
         if (!namespaceMap) {
-            return false;
+            return Promise.resolve(false);
         }
 
-        return namespaceMap.delete(key);
+        return Promise.resolve(namespaceMap.delete(key));
     }
 
     /**
      * Clear all keys in a namespace, or all namespaces if none specified
      */
-    async clear(namespace?: string): Promise<void> {
+    clear(namespace?: string): Promise<void> {
         const namespaces = this.stateMap.get(this.contextKey);
 
         if (!namespaces) {
-            return;
+            return Promise.resolve();
         }
 
         if (namespace) {
@@ -151,60 +138,62 @@ export class ContextStateService implements StateManager {
         } else {
             namespaces.clear();
         }
+
+        return Promise.resolve();
     }
 
     /**
      * Check if a key exists in a namespace
      */
-    async has(namespace: string, key: string): Promise<boolean> {
+    has(namespace: string, key: string): Promise<boolean> {
         const namespaces = this.stateMap.get(this.contextKey);
         if (!namespaces) {
-            return false;
+            return Promise.resolve(false);
         }
 
         const namespaceMap = namespaces.get(namespace);
         if (!namespaceMap) {
-            return false;
+            return Promise.resolve(false);
         }
 
-        return namespaceMap.has(key);
+        return Promise.resolve(namespaceMap.has(key));
     }
 
     /**
      * Get all keys in a namespace (required by StateManager interface)
      */
-    async keys(namespace: string): Promise<string[]> {
+    keys(namespace: string): Promise<string[]> {
         const namespaces = this.stateMap.get(this.contextKey);
         if (!namespaces) {
-            return [];
+            return Promise.resolve([]);
         }
 
         const namespaceMap = namespaces.get(namespace);
         if (!namespaceMap) {
-            return [];
+            return Promise.resolve([]);
         }
 
-        return Array.from(namespaceMap.keys());
+        return Promise.resolve(Array.from(namespaceMap.keys()));
     }
 
     /**
      * Get size of a namespace or total size (required by StateManager interface)
      */
-    async size(namespace?: string): Promise<number> {
+    size(namespace?: string): Promise<number> {
         const namespaces = this.stateMap.get(this.contextKey);
         if (!namespaces) {
-            return 0;
+            return Promise.resolve(0);
         }
 
         if (namespace) {
             const namespaceMap = namespaces.get(namespace);
-            return namespaceMap ? namespaceMap.size : 0;
+            return Promise.resolve(namespaceMap ? namespaceMap.size : 0);
         } else {
             let total = 0;
             for (const namespaceMap of namespaces.values()) {
                 total += namespaceMap.size;
             }
-            return total;
+            return Promise.resolve(total);
         }
     }
 
@@ -300,23 +289,23 @@ export class ContextStateService implements StateManager {
 /**
  * Global state service using a global key for shared state
  */
-export class GlobalStateService implements StateManager {
+export class GlobalStateService implements StateManager<unknown> {
     private static readonly globalState = new Map<
         string,
         Map<string, unknown>
     >();
 
-    async get<T>(namespace: string, key: string): Promise<T | undefined> {
+    get(namespace: string, key: string): Promise<unknown> {
         const namespaceMap = GlobalStateService.globalState.get(namespace);
 
         if (!namespaceMap) {
-            return undefined;
+            return Promise.resolve(undefined);
         }
 
-        return namespaceMap.get(key) as T | undefined;
+        return Promise.resolve(namespaceMap.get(key));
     }
 
-    async set(namespace: string, key: string, value: unknown): Promise<void> {
+    set(namespace: string, key: string, value: unknown): Promise<void> {
         let namespaceMap = GlobalStateService.globalState.get(namespace);
 
         if (!namespaceMap) {
@@ -325,19 +314,20 @@ export class GlobalStateService implements StateManager {
         }
 
         namespaceMap.set(key, value);
+        return Promise.resolve();
     }
 
-    async delete(namespace: string, key: string): Promise<boolean> {
+    delete(namespace: string, key: string): Promise<boolean> {
         const namespaceMap = GlobalStateService.globalState.get(namespace);
 
         if (!namespaceMap) {
-            return false;
+            return Promise.resolve(false);
         }
 
-        return namespaceMap.delete(key);
+        return Promise.resolve(namespaceMap.delete(key));
     }
 
-    async clear(namespace?: string): Promise<void> {
+    clear(namespace?: string): Promise<void> {
         if (namespace) {
             const namespaceMap = GlobalStateService.globalState.get(namespace);
 
@@ -347,28 +337,32 @@ export class GlobalStateService implements StateManager {
         } else {
             GlobalStateService.globalState.clear();
         }
+
+        return Promise.resolve();
     }
 
-    async has(namespace: string, key: string): Promise<boolean> {
+    has(namespace: string, key: string): Promise<boolean> {
         const namespaceMap = GlobalStateService.globalState.get(namespace);
-        return namespaceMap ? namespaceMap.has(key) : false;
+        return Promise.resolve(namespaceMap ? namespaceMap.has(key) : false);
     }
 
-    async keys(namespace: string): Promise<string[]> {
+    keys(namespace: string): Promise<string[]> {
         const namespaceMap = GlobalStateService.globalState.get(namespace);
-        return namespaceMap ? Array.from(namespaceMap.keys()) : [];
+        return Promise.resolve(
+            namespaceMap ? Array.from(namespaceMap.keys()) : [],
+        );
     }
 
-    async size(namespace?: string): Promise<number> {
+    size(namespace?: string): Promise<number> {
         if (namespace) {
             const namespaceMap = GlobalStateService.globalState.get(namespace);
-            return namespaceMap ? namespaceMap.size : 0;
+            return Promise.resolve(namespaceMap ? namespaceMap.size : 0);
         } else {
             let total = 0;
             for (const namespaceMap of GlobalStateService.globalState.values()) {
                 total += namespaceMap.size;
             }
-            return total;
+            return Promise.resolve(total);
         }
     }
 
@@ -391,19 +385,19 @@ export class GlobalStateService implements StateManager {
 /**
  * Factory function to create a state service for a specific context
  */
-export function createStateService(
+export function createStateService<T>(
     contextKey: object,
     options?: {
         maxNamespaceSize?: number;
         maxNamespaces?: number;
     },
-): StateManager {
-    return new ContextStateService(contextKey, options);
+): StateManager<T> {
+    return new ContextStateService<T>(contextKey, options);
 }
 
 /**
  * Factory function to create a global state service
  */
-export function createGlobalStateService(): StateManager {
+export function createGlobalStateService(): StateManager<unknown> {
     return new GlobalStateService();
 }

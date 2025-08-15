@@ -121,7 +121,7 @@ export interface KernelHandlerInterface {
     // Event management (via Kernel → Runtime)
     emit<T extends EventType>(eventType: T, data?: unknown): void;
     on<T extends AnyEvent>(eventType: string, handler: EventHandler<T>): void;
-    off(eventType: string, handler: EventHandler<AnyEvent>): void;
+    off(eventType: string, handler: EventHandler): void;
 
     // Stream processing (via Kernel → Runtime)
     createStream<S extends AnyEvent>(
@@ -161,7 +161,7 @@ export class KernelHandler implements KernelHandlerInterface {
     private initialized = false;
 
     // Handlers registrados localmente (serão passados para o Kernel)
-    private handlers = new Map<string, EventHandler<AnyEvent>[]>();
+    private handlers = new Map<string, EventHandler[]>();
 
     // Infinite loop protection
     private loopProtection: {
@@ -386,14 +386,14 @@ export class KernelHandler implements KernelHandlerInterface {
         if (!this.handlers.has(eventType)) {
             this.handlers.set(eventType, []);
         }
-        this.handlers.get(eventType)!.push(handler as EventHandler<AnyEvent>);
+        this.handlers.get(eventType)!.push(handler as EventHandler);
 
         // O Kernel já tem acesso ao Runtime e pode registrar handlers
         // Aqui poderíamos implementar um mecanismo para passar handlers para o Kernel
         this.logger.debug('Handler registered', { eventType });
     }
 
-    off(eventType: string, handler: EventHandler<AnyEvent>): void {
+    off(eventType: string, handler: EventHandler): void {
         this.ensureInitialized();
 
         const eventHandlers = this.handlers.get(eventType);
@@ -497,7 +497,7 @@ export class KernelHandler implements KernelHandlerInterface {
     async run(startEvent: AnyEvent): Promise<ExecutionResult> {
         this.ensureInitialized();
 
-        const execId = IdGenerator.executionId() as ExecutionId;
+        const execId = IdGenerator.executionId();
         const startTime = Date.now();
 
         this.logger.info('KernelHandler starting execution', {
@@ -561,7 +561,7 @@ export class KernelHandler implements KernelHandlerInterface {
      * Obtém status da execução (migrado do ExecutionEngine)
      */
     getExecutionStatus() {
-        const execId = IdGenerator.executionId() as ExecutionId;
+        const execId = IdGenerator.executionId();
         const startTime = Date.now();
 
         return {

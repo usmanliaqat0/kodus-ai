@@ -180,7 +180,7 @@ export interface WorkflowContext extends BaseContext {
     persistorService?: Persistor;
 
     // State management for execution state
-    stateManager: ContextStateService;
+    stateManager: ContextStateService<unknown>;
 
     // === WORKFLOW STATE ===
     // Current workflow data/variables
@@ -204,7 +204,7 @@ export interface WorkflowContext extends BaseContext {
 
     // === RUNTIME CAPABILITIES ===
     // Event stream for runtime communication
-    stream?: EventStream<Event>;
+    stream?: EventStream;
     sendEvent?: (event: Event) => Promise<void>;
     emit?: (event: Event) => void;
 

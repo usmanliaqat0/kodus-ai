@@ -106,7 +106,7 @@ export class StepExecution {
     private logger = createLogger('step-execution');
 
     startStep(iteration: number): string {
-        const stepId = `step-${iteration}-${Date.now()}`;
+        const stepId = `step-${iteration.toString()}-${Date.now().toString()}`;
         this.currentStepId = stepId;
 
         this.steps.set(stepId, {
@@ -280,7 +280,7 @@ export class EnhancedMessageContext {
         metadata?: MessageEntry['metadata'],
         stepId?: string,
     ): Promise<string> {
-        const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const messageId = `msg-${Date.now().toString()}-${Math.random().toString(36).slice(2, 11)}`;
 
         const message: MessageEntry = {
             id: messageId,
@@ -387,32 +387,36 @@ export class EnhancedMessageContext {
             // 1. MEMORY: Buscar memórias relevantes
             if (query) {
                 const memories = await context.memory.search(query, 3);
-                if (memories && memories.length > 0) {
+                if (memories.length > 0) {
                     contextParts.push('\n📚 Conhecimento relevante:');
                     memories.forEach((memory, i) => {
                         const memoryStr =
                             typeof memory === 'string'
                                 ? memory
                                 : JSON.stringify(memory);
-                        contextParts.push(`${i + 1}. ${memoryStr}`);
+                        contextParts.push(
+                            `${(i + 1).toString()}. ${memoryStr}`,
+                        );
                     });
                 }
             }
 
             // 2. SESSION: Histórico recente de conversa
             const sessionHistory = await context.session.getHistory();
-            if (sessionHistory && sessionHistory.length > 0) {
+            if (sessionHistory.length > 0) {
                 contextParts.push('\n💬 Conversa recente:');
                 sessionHistory.slice(-3).forEach((entry, i) => {
                     const formattedEntry = this.formatSessionEntry(entry);
                     if (formattedEntry) {
-                        contextParts.push(`${i + 1}. ${formattedEntry}`);
+                        contextParts.push(
+                            `${(i + 1).toString()}. ${formattedEntry}`,
+                        );
                     }
                 });
             }
 
             // 3. STATE: Estado atual de trabalho
-            const workingState = await context.state.getNamespace('execution');
+            const workingState = context.state.getNamespace('execution');
             if (workingState && workingState.size > 0) {
                 contextParts.push('\n⚡ Estado atual:');
                 let count = 0;
@@ -436,7 +440,7 @@ export class EnhancedMessageContext {
                             ? msg.content
                             : JSON.stringify(msg.content);
                     contextParts.push(
-                        `${i + 1}. [${msg.role}] ${contentStr.substring(0, 100)}...`,
+                        `${(i + 1).toString()}. [${msg.role}] ${contentStr.substring(0, 100)}...`,
                     );
                 });
             }
@@ -682,12 +686,12 @@ export class ContextManager {
     }> {
         try {
             const sessionHistory = await context.session.getHistory();
-            const stateKeys = await context.state.getNamespace('ai_sdk');
+            const stateKeys = context.state.getNamespace('ai_sdk');
             const messageCount = this.messageContext.getMessageCount();
 
             return {
-                sessionEntries: sessionHistory?.length || 0,
-                stateKeys: stateKeys?.size || 0,
+                sessionEntries: sessionHistory.length || 0,
+                stateKeys: stateKeys?.size ?? 0,
                 memoryItems: 0, // Memory doesn't have a direct count method
                 messageCount,
             };

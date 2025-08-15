@@ -59,8 +59,8 @@ export class GeminiProvider implements LLMProvider {
 
     constructor(config: GeminiConfig) {
         this.client = new GoogleGenerativeAI(config.apiKey);
-        this.modelName = config.model || 'gemini-1.5-flash'; // Use stable model by default
-        this.defaultOptions = config.defaultOptions || {};
+        this.modelName = config.model ?? 'gemini-1.5-flash'; // Use stable model by default
+        this.defaultOptions = config.defaultOptions ?? {};
 
         this.logger.info('Gemini Provider initialized', {
             model: this.modelName,
@@ -94,16 +94,16 @@ export class GeminiProvider implements LLMProvider {
 
             // Generate content
             const result = await model.generateContent(prompt);
-            const response = await result.response;
+            const response = result.response;
             const text = response.text();
 
             const llmResponse: LLMResponse = {
                 content: text,
                 usage: {
-                    promptTokens: response.usageMetadata?.promptTokenCount || 0,
+                    promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
                     completionTokens:
-                        response.usageMetadata?.candidatesTokenCount || 0,
-                    totalTokens: response.usageMetadata?.totalTokenCount || 0,
+                        response.usageMetadata?.candidatesTokenCount ?? 0,
+                    totalTokens: response.usageMetadata?.totalTokenCount ?? 0,
                 },
             };
 
@@ -258,7 +258,7 @@ export function createGeminiProvider(config: GeminiConfig): GeminiProvider {
  * Helper to create Gemini provider from environment variables
  */
 export function createGeminiProviderFromEnv(): GeminiProvider {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
     if (!apiKey) {
         throw new Error(
             'GEMINI_API_KEY or GOOGLE_API_KEY environment variable is required',
@@ -267,7 +267,7 @@ export function createGeminiProviderFromEnv(): GeminiProvider {
 
     return new GeminiProvider({
         apiKey,
-        model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+        model: process.env.GEMINI_MODEL ?? 'gemini-1.5-flash',
         defaultOptions: {
             temperature: process.env.GEMINI_TEMPERATURE
                 ? parseFloat(process.env.GEMINI_TEMPERATURE)

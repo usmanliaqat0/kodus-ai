@@ -157,8 +157,8 @@ export interface ToolConfig {
     name: string;
     title?: string;
     description: string;
-    inputSchema: z.ZodSchema<unknown>;
-    outputSchema?: z.ZodSchema<unknown>;
+    inputSchema: z.ZodSchema;
+    outputSchema?: z.ZodSchema;
     execute: (input: unknown, context: ToolContext) => Promise<unknown>;
     categories?: string[];
     dependencies?: string[];
@@ -300,9 +300,7 @@ const orchestrator = new SDKOrchestrator({
     /**
      * Create agent - APENAS delega para AgentEngine/AgentExecutor
      */
-    async createAgent(
-        config: AgentConfig,
-    ): Promise<AgentDefinition<unknown, unknown, unknown>> {
+    async createAgent(config: AgentConfig): Promise<AgentDefinition> {
         this.logger.info('Creating agent', {
             name: config.name,
             planner:
@@ -321,7 +319,7 @@ const orchestrator = new SDKOrchestrator({
         }
 
         // Create basic agent definition
-        const agentDefinition: AgentDefinition<unknown, unknown, unknown> = {
+        const agentDefinition: AgentDefinition = {
             name: config.name,
             identity: config.identity,
             think: async () => {
@@ -356,9 +354,7 @@ const orchestrator = new SDKOrchestrator({
         };
 
         // Create agent instance based on execution mode
-        let agentInstance:
-            | AgentEngine<unknown, unknown, unknown>
-            | AgentExecutor<unknown, unknown, unknown>;
+        let agentInstance: AgentEngine | AgentExecutor;
 
         if (config.executionMode === 'workflow') {
             agentInstance = new AgentExecutor(
@@ -429,7 +425,7 @@ const orchestrator = new SDKOrchestrator({
             userContext?: UserContext;
             sessionId?: SessionId;
         },
-    ): Promise<OrchestrationResult<unknown>> {
+    ): Promise<OrchestrationResult> {
         const startTime = Date.now();
         const correlationId = IdGenerator.correlationId();
         const obs = getObservability();
@@ -697,8 +693,8 @@ const orchestrator = new SDKOrchestrator({
     /**
      * Create tool - APENAS delega para ToolEngine
      */
-    createTool(config: ToolConfig): ToolDefinition<unknown, unknown> {
-        const toolDefinition = defineTool<unknown, unknown>({
+    createTool(config: ToolConfig): ToolDefinition {
+        const toolDefinition = defineTool({
             name: config.name,
             description: config.description,
             inputSchema: config.inputSchema,
@@ -729,7 +725,7 @@ const orchestrator = new SDKOrchestrator({
     async callTool(
         toolName: string,
         input: unknown,
-    ): Promise<OrchestrationResult<unknown>> {
+    ): Promise<OrchestrationResult> {
         const startTime = Date.now();
         const correlationId = IdGenerator.correlationId();
 
@@ -739,10 +735,7 @@ const orchestrator = new SDKOrchestrator({
         });
 
         try {
-            const result = await this.toolEngine.executeCall(
-                toolName as ToolId,
-                input,
-            );
+            const result = await this.toolEngine.executeCall(toolName, input);
             const duration = Date.now() - startTime;
 
             return {
@@ -1073,9 +1066,7 @@ const orchestrator = new SDKOrchestrator({
      * Inject kernel handler into agent
      */
     private async injectKernelHandler(
-        agentInstance:
-            | AgentEngine<unknown, unknown, unknown>
-            | AgentExecutor<unknown, unknown, unknown>,
+        agentInstance: AgentEngine | AgentExecutor,
     ): Promise<void> {
         try {
             if (!this.kernelHandler) {

@@ -209,10 +209,9 @@ export const agentIdentitySchema = z
             return fields.some(
                 (field) =>
                     field !== undefined &&
-                    field !== null &&
                     (Array.isArray(field)
                         ? field.length > 0
-                        : field.trim?.() !== ''),
+                        : field.trim() !== ''),
             );
         },
         {

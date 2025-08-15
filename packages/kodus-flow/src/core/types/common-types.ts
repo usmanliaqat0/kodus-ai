@@ -225,7 +225,7 @@ export { EVENT_TYPES, createEvent } from './events.js';
 
 export type WorkflowEventHandler<E extends AnyEvent = AnyEvent> = (
     event: E,
-) => Promise<AnyEvent | void> | AnyEvent | void;
+) => Promise<AnyEvent | undefined> | AnyEvent | undefined;
 
 // Re-export enhanced types for consistency
 //
@@ -328,11 +328,15 @@ export interface SnapshotOptions {
 
 // ===== EVENT HANDLERS =====
 // Event handler types for the SDK
-export type EventHandler<E extends AnyEvent = AnyEvent, R = AnyEvent | void> = (
-    event: E,
-) => Promise<R> | R;
+export type EventHandler<
+    E extends AnyEvent = AnyEvent,
+    R = AnyEvent | undefined,
+> = (event: E) => Promise<R> | R;
 
-export type HandlerReturn = AnyEvent | void | Promise<AnyEvent | void>;
+export type HandlerReturn =
+    | AnyEvent
+    | undefined
+    | Promise<AnyEvent | undefined>;
 
 export type EventPredicate = (event: AnyEvent) => boolean;
 
@@ -348,9 +352,9 @@ export interface EventStream<T extends AnyEvent = AnyEvent>
     withMiddleware(middleware: unknown): EventStream<T>;
     debounce(delayMs: number): EventStream<T>;
     throttle(intervalMs: number): EventStream<T>;
-    batch(size: number, timeoutMs?: number): EventStream<AnyEvent>;
+    batch(size: number, timeoutMs?: number): EventStream;
     merge(...streams: EventStream<T>[]): EventStream<T>;
-    combineLatest(...streams: EventStream<T>[]): EventStream<AnyEvent>;
+    combineLatest(...streams: EventStream<T>[]): EventStream;
 }
 
 // ===== LEGACY SCHEMAS =====
@@ -691,14 +695,14 @@ export interface CombinedIntelligence {
  * Create a new execution ID
  */
 export function createExecutionId(): string {
-    return `exec_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    return `exec_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
 /**
  * Create a new correlation ID
  */
 export function createCorrelationId(): string {
-    return `corr_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    return `corr_${Date.now().toString()}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
 /**

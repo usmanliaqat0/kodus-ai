@@ -1156,7 +1156,7 @@ ${JSON.stringify(example.expectedPlan, null, 2)}`,
 
             // Handle enums with detailed formatting
             if (propObj.enum && Array.isArray(propObj.enum)) {
-                const enumValues = propObj.enum as unknown[];
+                const enumValues = propObj.enum;
                 const formattedValues = enumValues
                     .map((v) => `"${v}"`)
                     .join(' | ');
@@ -1220,8 +1220,7 @@ ${JSON.stringify(example.expectedPlan, null, 2)}`,
                             nestedPropObj.enum &&
                             Array.isArray(nestedPropObj.enum)
                         ) {
-                            const nestedEnumValues =
-                                nestedPropObj.enum as unknown[];
+                            const nestedEnumValues = nestedPropObj.enum;
                             nestedTypeDisplay = `enum[${nestedEnumValues.join(
                                 '|',
                             )}]`;
@@ -1245,10 +1244,7 @@ ${JSON.stringify(example.expectedPlan, null, 2)}`,
 
             // Handle nested object properties
             if (typeDisplay.startsWith('object{') && propObj.properties) {
-                const nestedProps = propObj.properties as Record<
-                    string,
-                    unknown
-                >;
+                const nestedProps = propObj.properties;
 
                 // Check if this object has a required array
                 const nestedRequired =
@@ -1300,8 +1296,7 @@ ${JSON.stringify(example.expectedPlan, null, 2)}`,
                         nestedPropObj.enum &&
                         Array.isArray(nestedPropObj.enum)
                     ) {
-                        const nestedEnumValues =
-                            nestedPropObj.enum as unknown[];
+                        const nestedEnumValues = nestedPropObj.enum;
                         nestedTypeDisplay = `enum[${nestedEnumValues.join(
                             '|',
                         )}]`;
@@ -1353,7 +1348,7 @@ ${JSON.stringify(example.expectedPlan, null, 2)}`,
                                     Array.isArray(nestedArrayPropObj.enum)
                                 ) {
                                     const nestedArrayEnumValues =
-                                        nestedArrayPropObj.enum as unknown[];
+                                        nestedArrayPropObj.enum;
                                     nestedArrayTypeDisplay = `enum[${nestedArrayEnumValues.join(
                                         '|',
                                     )}]`;
@@ -1629,9 +1624,8 @@ ${JSON.stringify(example.expectedPlan, null, 2)}`,
                                                         textField
                                                     ] === 'string'
                                                 ) {
-                                                    const text = itemObj[
-                                                        textField
-                                                    ] as string;
+                                                    const text =
+                                                        itemObj[textField];
 
                                                     // Try to parse as JSON
                                                     try {

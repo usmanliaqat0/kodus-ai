@@ -343,11 +343,11 @@ export interface AgentContext {
 
     // State: Namespace-based working memory
     state: {
-        get: <T>(
+        get: (
             namespace: string,
             key: string,
             threadId?: string,
-        ) => Promise<T | undefined>;
+        ) => Promise<unknown>;
         set: (
             namespace: string,
             key: string,
@@ -355,9 +355,7 @@ export interface AgentContext {
             threadId?: string,
         ) => Promise<void>;
         clear: (namespace: string) => Promise<void>;
-        getNamespace: (
-            namespace: string,
-        ) => Promise<Map<string, unknown> | undefined>;
+        getNamespace: (namespace: string) => Map<string, unknown> | undefined;
     };
 
     // Memory: Long-term storage with search
@@ -435,7 +433,7 @@ export interface AgentContext {
     };
     agentIdentity?: AgentIdentity;
     agentExecutionOptions?: AgentExecutionOptions;
-    allTools?: ToolDefinition<unknown, unknown>[];
+    allTools?: ToolDefinition[];
     stepExecution?: import('../context/step-execution.js').StepExecution;
     messageContext?: import('../context/step-execution.js').EnhancedMessageContext;
     contextManager?: import('../context/step-execution.js').ContextManager;
@@ -751,10 +749,9 @@ export const agentIdentitySchema = z
             return fields.some(
                 (field) =>
                     field !== undefined &&
-                    field !== null &&
                     (Array.isArray(field)
                         ? field.length > 0
-                        : field.trim?.() !== ''),
+                        : field.trim() !== ''),
             );
         },
         {
@@ -942,8 +939,8 @@ export function createAgentContext(
         systemContext?: SystemContext;
     } = {},
 ): AgentExecutionContext {
-    const correlationId = options.correlationId || IdGenerator.correlationId();
-    const invocationId = options.invocationId || IdGenerator.executionId();
+    const correlationId = options.correlationId ?? IdGenerator.correlationId();
+    const invocationId = options.invocationId ?? IdGenerator.executionId();
 
     // === CREATE SYSTEM CONTEXT ===
     const systemContext: SystemContext = {
@@ -981,7 +978,7 @@ export function createAgentContext(
         agentName,
         invocationId,
 
-        user: options.userContext || {},
+        user: options.userContext ?? {},
         system: systemContext,
 
         // Single runtime reference (mock for compatibility)
@@ -1064,7 +1061,7 @@ export function generateSystemPromptFromIdentity(
 
         // If no role but have expertise, use expertise as role
         if (!identity.role && !identity.goal && parts.length === 1) {
-            parts.unshift(`You are a ${identity.expertise[0]} expert.`);
+            parts.unshift(`You are a ${identity.expertise[0] ?? ''} expert.`);
         }
     }
 
@@ -1333,7 +1330,7 @@ export interface AgentLifecycleExecutionOptions {
 /**
  * Agent Lifecycle Execution Result
  */
-export interface AgentLifecycleResult extends BaseExecutionResult<unknown> {
+export interface AgentLifecycleResult extends BaseExecutionResult {
     // Lifecycle-specific information
     agentName: string;
     operation: string;
@@ -1370,7 +1367,7 @@ export function isValidStatusTransition(
         scheduled: ['starting', 'stopped'],
     };
 
-    return validTransitions[fromStatus]?.includes(toStatus) || false;
+    return validTransitions[fromStatus].includes(toStatus) || false;
 }
 
 /**
