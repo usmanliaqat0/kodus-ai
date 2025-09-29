@@ -13,7 +13,6 @@ import {
     INTEGRATION_SERVICE_TOKEN,
 } from '@/core/domain/integrations/contracts/integration.service.contracts';
 import { AutomationLevel } from '@/shared/domain/enums/automations-level.enum';
-import { UpdateOrCreateTeamAutomationUseCase } from './updateOrCreateTeamAutomationUseCase';
 import {
     AutomationCategoryMapping,
     AutomationType,
@@ -23,8 +22,6 @@ import {
 @Injectable()
 export class ActiveCodeManagementTeamAutomationsUseCase {
     constructor(
-        private readonly updateOrCreateAutomationUseCase: UpdateOrCreateTeamAutomationUseCase,
-
         @Inject(AUTOMATION_SERVICE_TOKEN)
         private readonly automationService: IAutomationService,
 
@@ -38,7 +35,7 @@ export class ActiveCodeManagementTeamAutomationsUseCase {
         private readonly request: Request & {
             user: { organization: { uuid: string } };
         },
-    ) { }
+    ) {}
 
     async execute(teamId: string, notify: boolean = true) {
         const organizationAndTeamData = {
@@ -60,16 +57,12 @@ export class ActiveCodeManagementTeamAutomationsUseCase {
 
         const teamAutomations = {
             teamId: teamId,
-            automations: automationsFiltered?.map((automation) =>
-            ({
+            automations: automationsFiltered?.map((automation) => ({
                 automationUuid: automation.uuid,
                 automationType: automation.automationType,
                 status: automation.status,
-            })
-            ),
+            })),
         };
-
-        await this.updateOrCreateAutomationUseCase.execute(teamAutomations, notify);
 
         return teamAutomations.automations;
     }

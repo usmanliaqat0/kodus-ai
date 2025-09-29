@@ -13,9 +13,7 @@ import { IntegrationConfigKey } from '@/shared/domain/enums/Integration-config-k
 import { PlatformType } from '@/shared/domain/enums/platform-type.enum';
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { IntegrationCategory } from '@/shared/domain/enums/integration-category.enum';
-import { ProjectManagementService } from '../platformIntegration/projectManagement.service';
 import { CodeManagementService } from '../platformIntegration/codeManagement.service';
-import { CommunicationService } from '../platformIntegration/communication.service';
 import { OrganizationAndTeamData } from '@/config/types/general/organizationAndTeamData';
 
 @Injectable()
@@ -26,9 +24,7 @@ export class IntegrationService implements IIntegrationService {
         @Inject(INTEGRATION_CONFIG_SERVICE_TOKEN)
         private readonly integrationConfigService: IIntegrationConfigService,
 
-        private readonly projectManagementService: ProjectManagementService,
         private readonly codeManagementService: CodeManagementService,
-        private readonly communicationService: CommunicationService,
     ) {}
 
     async checkConfigIntegration(
@@ -60,21 +56,13 @@ export class IntegrationService implements IIntegrationService {
         }[]
     > {
         try {
-            const [
-                communicationConnection,
-                projectManagementConnection,
-                codeManagementConnection,
-            ] = await Promise.all([
-                this.communicationService.verifyConnection(params),
-                this.projectManagementService.verifyConnection(params),
+            const [codeManagementConnection] = await Promise.all([
                 this.codeManagementService.verifyConnection(params),
             ]);
 
-            return [
-                communicationConnection,
-                projectManagementConnection,
-                codeManagementConnection,
-            ]?.filter((connection) => connection);
+            return [codeManagementConnection]?.filter(
+                (connection) => connection,
+            );
         } catch (error) {
             throw new BadRequestException(error);
         }
@@ -113,26 +101,6 @@ export class IntegrationService implements IIntegrationService {
                     IntegrationCategory.CODE_MANAGEMENT
                 ) {
                     integrationPlatforms.codeManagement = item?.platform;
-                }
-
-                if (
-                    item?.integrationCategory.toUpperCase() ===
-                    IntegrationCategory.COMMUNICATION
-                ) {
-                    integrationPlatforms.communication = item?.platform;
-                }
-
-                if (
-                    item?.integrationCategory.toUpperCase() ===
-                    IntegrationCategory.PROJECT_MANAGEMENT
-                ) {
-                    // This was done because in the database it is being saved in snake_case, and on the frontend, we need the information in kebab-case to be compared with integration keys
-                    if (item?.platform === PlatformType.AZURE_BOARDS) {
-                        integrationPlatforms.projectManagement =
-                            item?.platform.replace('_', '-');
-                    } else {
-                        integrationPlatforms.projectManagement = item?.platform;
-                    }
                 }
             }
 

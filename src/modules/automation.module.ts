@@ -10,7 +10,6 @@ import { AUTOMATION_EXECUTION_SERVICE_TOKEN } from '@/core/domain/automation/con
 import { AutomationExecutionRepository } from '@/core/infrastructure/adapters/repositories/typeorm/automationExecution.repository';
 import { AutomationExecutionService } from '@/core/infrastructure/adapters/services/automation/automation-execution.service';
 import { AutomationExecutionModel } from '@/core/infrastructure/adapters/repositories/typeorm/schema/automationExecution.model';
-import { JiraModule } from './jira.module';
 import { GithubModule } from './github.module';
 import { TeamsModule } from './team.module';
 import { Module, forwardRef } from '@nestjs/common';
@@ -49,7 +48,6 @@ import { BYOKDeterminationService } from '@/shared/infrastructure/services/byokD
             OrganizationAutomationExecutionModel,
         ]),
         forwardRef(() => TeamsModule),
-        forwardRef(() => JiraModule),
         forwardRef(() => GithubModule),
         forwardRef(() => TeamAutomationModule),
         forwardRef(() => OrganizationAutomationModule),
@@ -64,9 +62,9 @@ import { BYOKDeterminationService } from '@/shared/infrastructure/services/byokD
         forwardRef(() => CodebaseModule),
         forwardRef(() => PullRequestsModule),
         forwardRef(() => OrganizationParametersModule),
+        forwardRef(() => CodeReviewExecutionModule),
         AuthIntegrationModule,
         LicenseModule,
-        forwardRef(() => CodeReviewExecutionModule),
     ],
     providers: [
         ...UseCases,

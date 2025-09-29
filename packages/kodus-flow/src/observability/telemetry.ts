@@ -18,7 +18,13 @@ export class TelemetrySystem {
     private processors: SpanProcessor[] = [];
     private currentSpan?: Span;
 
-    constructor(config: Partial<TelemetryConfig> = {}) {
+    constructor(
+        config: Partial<TelemetryConfig> = {},
+        dependencies?: {
+            tracer?: SimpleTracer;
+            logger?: ReturnType<typeof createLogger>;
+        },
+    ) {
         this.config = {
             enabled: true,
             serviceName: 'kodus-flow',
@@ -37,7 +43,9 @@ export class TelemetrySystem {
             ...config,
         };
 
-        this.tracer = new SimpleTracer();
+        // Use injected dependencies or create defaults
+        this.logger = dependencies?.logger || createLogger('telemetry');
+        this.tracer = dependencies?.tracer || new SimpleTracer();
 
         this.logger.info('Telemetry system initialized', {
             enabled: this.config.enabled,

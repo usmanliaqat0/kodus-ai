@@ -5,7 +5,7 @@ import {
     MongoDBTelemetryItem,
     MongoDBErrorItem,
     MongoDBMetricsItem,
-} from '@/core/types/allTypes.js';
+} from './types.js';
 
 // Interface para a resposta da rastreabilidade
 export interface TraceabilityResponse {

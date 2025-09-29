@@ -9,11 +9,6 @@ import {
     IUpdateOrCreateMembersResponse,
 } from '@/core/domain/teamMembers/interfaces/team-members.interface';
 import { Inject, Injectable, forwardRef } from '@nestjs/common';
-import { CommunicationService } from './platformIntegration/communication.service';
-import {
-    IMSTeamsService,
-    MSTEAMS_SERVICE_TOKEN,
-} from '@/core/domain/msTeams/msTeams.service.contract';
 import { OrganizationAndTeamData } from '@/config/types/general/organizationAndTeamData';
 import { TeamMemberEntity } from '@/core/domain/teamMembers/entities/teamMember.entity';
 import { ITeamMemberService } from '@/core/domain/teamMembers/contracts/teamMembers.service.contracts';
@@ -33,11 +28,6 @@ export class TeamMemberService implements ITeamMemberService {
     constructor(
         @Inject(TEAM_MEMBERS_REPOSITORY_TOKEN)
         private readonly teamMembersRepository: ITeamMemberRepository,
-
-        @Inject(forwardRef(() => MSTEAMS_SERVICE_TOKEN))
-        private readonly msTeamsService: IMSTeamsService,
-
-        private readonly communication: CommunicationService,
 
         @Inject(USER_SERVICE_TOKEN)
         private readonly usersService: IUsersService,

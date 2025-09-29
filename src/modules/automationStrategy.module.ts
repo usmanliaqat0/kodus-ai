@@ -2,8 +2,6 @@ import { Module, forwardRef } from '@nestjs/common';
 import { AutomationModule } from './automation.module';
 import { EXECUTE_AUTOMATION_SERVICE_TOKEN } from '@/shared/domain/contracts/execute.automation.service.contracts';
 import { GithubModule } from './github.module';
-import { JiraModule } from './jira.module';
-import { SlackModule } from './slack.module';
 import { TeamMembersModule } from './teamMembers.module';
 import { ExecuteAutomationService } from '@/core/infrastructure/adapters/services/automation/processAutomation/config/execute.automation';
 import { AutomationRegistry } from '@/core/infrastructure/adapters/services/automation/processAutomation/config/register.automation';
@@ -32,9 +30,7 @@ import { BYOKDeterminationService } from '@/shared/infrastructure/services/byokD
 
 @Module({
     imports: [
-        forwardRef(() => JiraModule),
         forwardRef(() => GithubModule),
-        forwardRef(() => SlackModule),
         forwardRef(() => TeamAutomationModule),
         forwardRef(() => OrganizationAutomationModule),
         forwardRef(() => AutomationModule),
@@ -50,9 +46,9 @@ import { BYOKDeterminationService } from '@/shared/infrastructure/services/byokD
         forwardRef(() => CodeReviewFeedbackModule),
         forwardRef(() => PullRequestsModule),
         forwardRef(() => OrganizationParametersModule),
+        forwardRef(() => CodeReviewExecutionModule),
         AuthIntegrationModule,
         LicenseModule,
-        forwardRef(() => CodeReviewExecutionModule),
     ],
     providers: [
         ...UseCases,

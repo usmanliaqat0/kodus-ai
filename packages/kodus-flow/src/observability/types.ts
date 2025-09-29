@@ -141,16 +141,18 @@ export interface MongoDBConfig {
 }
 
 // Main observability configuration
+export interface LoggingConfig {
+    level?: LogLevel;
+    enabled?: boolean;
+    outputs?: string[];
+    filePath?: string;
+}
+
 export interface ObservabilityConfig {
     enabled: boolean;
     serviceName?: string;
     environment?: 'development' | 'production' | 'test';
-    logging?: {
-        level?: LogLevel;
-        enabled?: boolean;
-        outputs?: string[];
-        filePath?: string;
-    };
+    logging?: LoggingConfig;
     telemetry?: Partial<TelemetryConfig>;
     mongodb?: MongoDBConfig;
     apiPort?: number;
@@ -403,4 +405,110 @@ export interface LogProcessor {
     ): void;
     flush?(): Promise<void>;
     shutdown?(): Promise<void>;
+}
+
+// MongoDB Exporter Types (moved from core for standalone usage)
+export interface ObservabilityStorageConfig {
+    type: 'mongodb';
+    connectionString: string;
+    database: string;
+    collections?: {
+        logs?: string;
+        telemetry?: string;
+        metrics?: string;
+        errors?: string;
+    };
+    batchSize?: number;
+    flushIntervalMs?: number;
+    ttlDays?: number;
+    enableObservability?: boolean;
+}
+
+export interface MongoDBExporterConfig {
+    connectionString: string;
+    database: string;
+    collections: {
+        logs: string;
+        telemetry: string;
+        errors: string;
+    };
+    batchSize: number;
+    flushIntervalMs: number;
+    maxRetries: number;
+    ttlDays: number;
+    enableObservability: boolean;
+}
+
+// Tipos essenciais para observabilidade simples
+export interface MongoDBLogItem {
+    _id?: string;
+    timestamp: Date;
+    level: 'debug' | 'info' | 'warn' | 'error';
+    message: string;
+    component: string;
+    correlationId?: string;
+    tenantId?: string;
+    executionId?: string;
+    sessionId?: string;
+    metadata?: Record<string, unknown>;
+    error?: {
+        name: string;
+        message: string;
+        stack?: string;
+    };
+    createdAt: Date;
+}
+
+export interface MongoDBTelemetryItem {
+    _id?: string;
+    timestamp: Date;
+    name: string;
+    duration: number;
+    correlationId?: string;
+    tenantId?: string;
+    executionId?: string;
+    sessionId?: string;
+    agentName?: string;
+    toolName?: string;
+    phase?: 'think' | 'act' | 'observe';
+    attributes: Record<string, string | number | boolean>;
+    status: 'ok' | 'error';
+    error?: {
+        name: string;
+        message: string;
+        stack?: string;
+    };
+    createdAt: Date;
+}
+
+export interface MongoDBMetricsItem {
+    _id?: string;
+    timestamp: Date;
+    correlationId?: string;
+    tenantId?: string;
+    executionId?: string;
+    metrics: SystemMetrics;
+    createdAt: Date;
+}
+
+export interface MongoDBErrorItem {
+    timestamp: Date;
+    correlationId?: string;
+    tenantId?: string;
+    executionId?: string;
+    sessionId?: string;
+    errorName: string;
+    errorMessage: string;
+    errorStack?: string;
+    context: Record<string, unknown>;
+    createdAt: Date;
+}
+
+export interface SystemMetrics {
+    timestamp: number;
+    memoryUsage: number;
+    cpuUsage: number;
+    queueDepth: number;
+    processingRate: number;
+    averageProcessingTime: number;
 }

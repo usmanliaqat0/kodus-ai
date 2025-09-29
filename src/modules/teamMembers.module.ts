@@ -4,10 +4,8 @@ import { TEAM_MEMBERS_SERVICE_TOKEN } from '@/core/domain/teamMembers/contracts/
 import { TeamMembersController } from '@/core/infrastructure/http/controllers/teamMembers.controller';
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { SlackModule } from './slack.module';
 import { UsersModule } from '@/modules/user.module';
 import { PlatformIntegrationModule } from './platformIntegration.module';
-import { MSTeamsModule } from './msTeams.module';
 import { TeamMemberModel } from '@/core/infrastructure/adapters/repositories/typeorm/schema/teamMember.model';
 import { TeamMemberService } from '@/core/infrastructure/adapters/services/teamMembers.service';
 import { TeamMemberDatabaseRepository } from '@/core/infrastructure/adapters/repositories/typeorm/teamMember.repository';
@@ -21,15 +19,12 @@ import { ParametersModule } from './parameters.module';
 @Module({
     imports: [
         TypeOrmModule.forFeature([TeamMemberModel]),
-        forwardRef(() => MSTeamsModule),
-        forwardRef(() => SlackModule),
         forwardRef(() => PlatformIntegrationModule),
         forwardRef(() => TeamsModule),
         forwardRef(() => IntegrationModule),
         forwardRef(() => IntegrationConfigModule),
         forwardRef(() => UsersModule),
         forwardRef(() => ParametersModule),
-        MSTeamsModule,
     ],
     providers: [
         ...UseCases,
@@ -47,4 +42,4 @@ import { ParametersModule } from './parameters.module';
     exports: [TEAM_MEMBERS_SERVICE_TOKEN, TEAM_MEMBERS_REPOSITORY_TOKEN],
     controllers: [TeamMembersController],
 })
-export class TeamMembersModule { }
+export class TeamMembersModule {}
