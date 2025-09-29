@@ -52,6 +52,7 @@ import { CodeReviewExecutionModule } from './codeReviewExecution.module';
 import { PermissionsModule } from './permissions.module';
 import { WebhookLogModule } from './webhookLog.module';
 import { ByokModule } from '@/ee/byok/byok.module';
+import { KodyFineTuningContextModule } from './kodyFineTuningContext.module';
 
 @Module({
     imports: [
@@ -111,6 +112,7 @@ import { ByokModule } from '@/ee/byok/byok.module';
         },
         WebhookLogModule,
         ByokModule,
+        KodyFineTuningContextModule,
     ],
     providers: [
         {

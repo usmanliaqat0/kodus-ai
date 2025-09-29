@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { ISuggestionEmbeddedService } from '../domain/suggestionEmbedded/contracts/suggestionEmbedded.service.contract';
-import { SuggestionEmbeddedDatabaseRepository } from '../suggestionEmbedded.repository';
 import { PinoLoggerService } from '@/core/infrastructure/adapters/services/logger/pino.service';
-import { ISuggestionEmbedded } from '../domain/suggestionEmbedded/interfaces/suggestionEmbedded.interface';
-import { SuggestionEmbeddedEntity } from '../domain/suggestionEmbedded/entities/suggestionEmbedded.entity';
 import { ISuggestionToEmbed } from '@/core/domain/pullRequests/interfaces/pullRequests.interface';
 import { FindManyOptions } from 'typeorm';
 import { CodeSuggestion } from '@/config/types/general/codeReview.type';
 import { KodyFineTuningService } from '../kodyFineTuning.service';
 import { getOpenAIEmbedding } from '@/shared/utils/langchainCommon/document';
-import { FeedbackType } from '../domain/enums/feedbackType.enum';
+import { ISuggestionEmbeddedService } from '@/core/domain/kodyFineTuning/suggestionEmbedded/contracts/suggestionEmbedded.service.contract';
+import { ISuggestionEmbedded } from '@/core/domain/kodyFineTuning/suggestionEmbedded/interfaces/suggestionEmbedded.interface';
+import { SuggestionEmbeddedEntity } from '@/core/domain/kodyFineTuning/suggestionEmbedded/entities/suggestionEmbedded.entity';
+import { FeedbackType } from '@/core/domain/kodyFineTuning/enums/feedbackType.enum';
+import { SuggestionEmbeddedDatabaseRepository } from '../../../repositories/typeorm/suggestionEmbedded.repository';
 
 export interface SuggestionEmbeddedFeedbacks {
     positiveFeedbacks: number;
