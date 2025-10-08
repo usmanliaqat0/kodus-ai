@@ -47,6 +47,7 @@ import { prompt_generate_conversation_title } from './generateConversationTitle'
 import { prompt_removeRepeatedSuggestions } from './removeRepeatedSuggestions';
 import { prompt_validateImplementedSuggestions } from './validateImplementedSuggestions';
 import { prompt_codeReviewSafeguard_system, prompt_codeReviewSafeguard_user } from './codeReviewSafeguard';
+import { prompt_kodyRulesFileConverter_system, prompt_kodyRulesFileConverter_user } from './kodyRulesFileConverter';
 
 export {
     prompt_ensureQuality,
@@ -87,4 +88,6 @@ export {
     prompt_validateImplementedSuggestions,
     prompt_codeReviewSafeguard_system,
     prompt_codeReviewSafeguard_user,
+    prompt_kodyRulesFileConverter_system,
+    prompt_kodyRulesFileConverter_user,
 };

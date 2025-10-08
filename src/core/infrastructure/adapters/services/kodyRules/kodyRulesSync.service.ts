@@ -33,6 +33,7 @@ import * as path from 'path';
 import { ObservabilityService } from '../logger/observability.service';
 import { PermissionValidationService } from '@/ee/shared/services/permissionValidation.service';
 import { BYOKPromptRunnerService } from '@/shared/infrastructure/services/tokenTracking/byokPromptRunner.service';
+import { prompt_kodyRulesFileConverter_system, prompt_kodyRulesFileConverter_user } from '@/shared/utils/langchainCommon/prompts';
 
 type SyncTarget = {
     organizationAndTeamData: OrganizationAndTeamData;
@@ -865,10 +866,8 @@ export class KodyRulesSyncService {
                 params.organizationAndTeamData,
             );
 
-        const mainProvider =
-            LLMModelProvider.NOVITA_MOONSHOTAI_KIMI_K2_INSTRUCT;
-        const mainFallback =
-            LLMModelProvider.NOVITA_QWEN3_235B_A22B_THINKING_2507;
+        const mainProvider = LLMModelProvider.GEMINI_2_5_FLASH;
+        const mainFallback = LLMModelProvider.GEMINI_2_5_PRO;
         const mainRun = 'kodyRulesFileToRules';
 
         try {
@@ -900,27 +899,14 @@ export class KodyRulesSyncService {
                         })
                         .addPrompt({
                             role: PromptRole.SYSTEM,
-                            prompt: [
-                                'Convert repository rule files (Cursor, Claude, GitHub rules, coding standards, etc.) into a JSON array of Kody Rules. IMPORTANT: Enforce exactly one rule per file. If multiple candidate rules exist, merge them concisely into one or pick the most representative. Return an array with a single item or [].',
-                                'Output ONLY a valid JSON array. If none, output []. No comments or explanations.',
-                                'Each item MUST match exactly:',
-                                '{"title": string, "rule": string, "path": string, "sourcePath": string, "severity": "low"|"medium"|"high"|"critical", "scope"?: "file"|"pull-request", "status"?: "active"|"pending"|"rejected"|"deleted", "examples": [{ "snippet": string, "isCorrect": boolean }], "sourceSnippet"?: string}',
-                                'Detection: extract a rule only if the text imposes a requirement/restriction/convention/standard.',
-                                'Severity map: must/required/security/blocker → "high" or "critical"; should/warn → "medium"; tip/info/optional → "low".',
-                                'Scope: "file" for code/content; "pull-request" for PR titles/descriptions/commits/reviewers/labels.',
-                                'Status: "active" if mandatory; "pending" if suggestive; "deleted" if deprecated.',
-                                'path (target GLOB): use declared globs/paths when present (frontmatter like "globs:" or explicit sections). If none, set "**/*". If multiple, join with commas (e.g., "services/**,api/**").',
-                                'sourcePath: ALWAYS set to the exact file path provided in input.',
-                                'sourceSnippet: when possible, include an EXACT copy (verbatim) of the bullet/line/paragraph from the file that led to this rule. Do NOT paraphrase. If none is suitable, omit this key.',
-                                'Examples: prefer 1 incorrect and 1 correct (minimal snippets).',
-                                'Language: keep the rule language consistent with the source (EN or PT-BR).',
-                                'Do NOT include keys like repositoryId, origin, createdAt, updatedAt, uuid, or any extra keys.',
-                                'Keep strings concise and strictly typed.',
-                            ].join(' '),
+                            prompt: prompt_kodyRulesFileConverter_system(),
                         })
                         .addPrompt({
                             role: PromptRole.USER,
-                            prompt: `File: ${params.filePath}\n\nContent:\n${params.content}`,
+                            prompt: prompt_kodyRulesFileConverter_user({
+                                filePath: params.filePath,
+                                content: params.content,
+                            }),
                         })
                         .addCallbacks(callbacks) // <- injeta tracker
                         .addMetadata({ runName: mainRun })
