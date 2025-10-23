@@ -2,7 +2,6 @@
 /dist
 /node_modules
 
-.env
 .env.qa
 .env.prod
 _*
@@ -33,7 +32,6 @@ lerna-debug.log*
 *.sublime-workspace
 
 # IDE - VSCode
-.vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
@@ -47,8 +45,6 @@ lerna-debug.log*
 .yarn
 
 .cosine
-.vscode/settings.json
-.vscode/launch.json
 dev.env
 **/workflow-bundle.js
 /temporal-certs
@@ -79,3 +75,4 @@ repositorios-novos.json
 todos-repositorios.json
 repositorios-por-prefixo.json
 MIGRATION-GRPC-TO-HTTP.md
+config.bat
