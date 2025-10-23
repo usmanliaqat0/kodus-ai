@@ -13,6 +13,7 @@ import { SeverityLevel } from '@/shared/utils/enums/severityLevel.enum';
 import { LLMResponseProcessor } from '@/core/infrastructure/adapters/services/codeBase/utils/transforms/llmResponseProcessor.transform';
 import { CodeManagementService } from '@/core/infrastructure/adapters/services/platformIntegration/codeManagement.service';
 import { PinoLoggerService } from '@/core/infrastructure/adapters/services/logger/pino.service';
+import { calculateBackoffInterval } from '@/shared/utils/polling/exponential-backoff';
 import {
     LLMModelProvider,
     PromptRunnerService,
@@ -324,6 +325,7 @@ export class CodeAstAnalysisService implements IASTAnalysisService {
         organizationAndTeamData: OrganizationAndTeamData,
         codeChunk: string,
         fileName: string,
+        taskId: string,
     ): Promise<InitializeImpactAnalysisResponse> {
         try {
             const { headRepo, baseRepo } = await this.getRepoParams(
@@ -346,6 +348,7 @@ export class CodeAstAnalysisService implements IASTAnalysisService {
                         codeChunk,
                         fileName,
                         organizationId: organizationAndTeamData.organizationId,
+                        taskId,
                     },
                     {
                         headers: {
@@ -375,6 +378,7 @@ export class CodeAstAnalysisService implements IASTAnalysisService {
         pullRequest: any,
         platformType: string,
         organizationAndTeamData: OrganizationAndTeamData,
+        taskId: string,
     ): Promise<GetImpactAnalysisResponse> {
         try {
             const { headRepo, baseRepo } = await this.getRepoParams(
@@ -395,6 +399,7 @@ export class CodeAstAnalysisService implements IASTAnalysisService {
                         baseRepo,
                         headRepo,
                         organizationId: organizationAndTeamData.organizationId,
+                        taskId,
                     },
                     {
                         headers: {
@@ -439,7 +444,8 @@ export class CodeAstAnalysisService implements IASTAnalysisService {
         organizationAndTeamData: OrganizationAndTeamData,
         diff: string,
         filePath: string,
-    ): Promise<string> {
+        taskId: string,
+    ): Promise<{ content: string }> {
         const { headRepo, baseRepo } = await this.getRepoParams(
             repository,
             pullRequest,
@@ -447,7 +453,7 @@ export class CodeAstAnalysisService implements IASTAnalysisService {
             platformType,
         );
 
-        const response = await this.astAxios.post<string>(
+        const response = await this.astAxios.post<{ content: string }>(
             '/api/ast/diff/content',
             {
                 baseRepo,
@@ -455,6 +461,7 @@ export class CodeAstAnalysisService implements IASTAnalysisService {
                 diff,
                 filePath,
                 organizationId: organizationAndTeamData.organizationId,
+                taskId,
             },
             {
                 headers: {
@@ -462,8 +469,7 @@ export class CodeAstAnalysisService implements IASTAnalysisService {
                 },
             },
         );
-
-        return response;
+        return response ?? { content: '' };
     }
 
     private async getRepoParams(
@@ -533,18 +539,25 @@ export class CodeAstAnalysisService implements IASTAnalysisService {
         organizationAndTeamData: OrganizationAndTeamData,
         options: {
             timeout?: number;
-            interval?: number;
+            initialInterval?: number;
+            maxInterval?: number;
+            useExponentialBackoff?: boolean;
         } = {
-            timeout: 60000, // Default timeout of 60 seconds
-            interval: 5000, // Check every 5 seconds
+            timeout: 120000, // Default timeout increased to 2 minutes
+            initialInterval: 1000, // Start with 1 second (faster for quick tasks)
+            maxInterval: 30000, // Cap at 30 seconds
+            useExponentialBackoff: true, // Enable exponential backoff by default
         },
     ): Promise<GetTaskInfoResponse> {
         if (!taskId) {
             throw new Error('Task ID is required to await task completion');
         }
 
-        const { timeout, interval } = options;
+        const { timeout, initialInterval, maxInterval, useExponentialBackoff } =
+            options;
+
         const startTime = Date.now();
+        let attempt = 0;
 
         const endStates = [
             TaskStatus.TASK_STATUS_COMPLETED,
@@ -553,15 +566,31 @@ export class CodeAstAnalysisService implements IASTAnalysisService {
         ];
 
         while (true) {
-            if (Date.now() - startTime > timeout) {
+            const elapsedTime = Date.now() - startTime;
+
+            if (elapsedTime > timeout) {
+                this.logger.error({
+                    message: `Task ${taskId} timed out after ${timeout}ms (${Math.floor(timeout / 1000)}s)`,
+                    context: CodeAstAnalysisService.name,
+                    metadata: {
+                        taskId,
+                        timeout,
+                        attempts: attempt,
+                        elapsedTime,
+                    },
+                });
                 throw new Error(`Task ${taskId} timed out after ${timeout}ms`);
             }
 
             try {
                 this.logger.log({
-                    message: `Polling task ${taskId} status`,
+                    message: `Polling task ${taskId} status (attempt ${attempt + 1})`,
                     context: CodeAstAnalysisService.name,
-                    metadata: { taskId },
+                    metadata: {
+                        taskId,
+                        attempt: attempt + 1,
+                        elapsedTime: `${Math.floor(elapsedTime / 1000)}s`,
+                    },
                 });
 
                 const taskStatus = await this.astAxios.get<GetTaskInfoResponse>(
@@ -579,6 +608,16 @@ export class CodeAstAnalysisService implements IASTAnalysisService {
                 }
 
                 if (endStates.includes(taskStatus.task.status)) {
+                    this.logger.log({
+                        message: `Task ${taskId} completed with status: ${taskStatus.task.status}`,
+                        context: CodeAstAnalysisService.name,
+                        metadata: {
+                            taskId,
+                            status: taskStatus.task.status,
+                            totalAttempts: attempt + 1,
+                            totalTime: `${Math.floor(elapsedTime / 1000)}s`,
+                        },
+                    });
                     return taskStatus;
                 }
             } catch (error) {
@@ -597,11 +636,35 @@ export class CodeAstAnalysisService implements IASTAnalysisService {
                     message: `A transient error occurred while polling for task ${taskId}. Retrying...`,
                     error,
                     context: CodeAstAnalysisService.name,
-                    metadata: { taskId },
+                    metadata: { taskId, attempt: attempt + 1 },
                 });
             }
 
-            await new Promise((resolve) => setTimeout(resolve, interval));
+            // Calculate next wait interval using shared utility
+            const waitInterval = useExponentialBackoff
+                ? calculateBackoffInterval(attempt, {
+                      baseInterval: initialInterval,
+                      maxInterval,
+                  })
+                : calculateBackoffInterval(attempt, {
+                      baseInterval: initialInterval,
+                      maxInterval,
+                      multiplier: 1, // Linear increment
+                  });
+
+            this.logger.debug({
+                message: `Waiting ${waitInterval}ms before next poll`,
+                context: CodeAstAnalysisService.name,
+                metadata: {
+                    taskId,
+                    waitInterval,
+                    attempt: attempt + 1,
+                    useExponentialBackoff,
+                },
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, waitInterval));
+            attempt++;
         }
     }
 
@@ -610,6 +673,7 @@ export class CodeAstAnalysisService implements IASTAnalysisService {
         pullRequest: any,
         platformType: string,
         organizationAndTeamData: OrganizationAndTeamData,
+        taskId: string,
     ): Promise<void> {
         try {
             const { headRepo, baseRepo } = await this.getRepoParams(
@@ -623,16 +687,20 @@ export class CodeAstAnalysisService implements IASTAnalysisService {
                 throw new Error('Head repository parameters are missing');
             }
 
-            await this.astAxios.delete('/api/ast/repositories/delete', {
-                headers: {
-                    'x-task-key': organizationAndTeamData.organizationId,
-                },
-                data: {
+            await this.astAxios.post(
+                '/api/ast/repositories/delete',
+                {
                     baseRepo,
                     headRepo,
                     organizationId: organizationAndTeamData.organizationId,
+                    taskId,
                 },
-            });
+                {
+                    headers: {
+                        'x-task-key': organizationAndTeamData.organizationId,
+                    },
+                },
+            );
         } catch (error) {
             this.logger.error({
                 message: `Error during AST analysis deletion for PR#${pullRequest.number}`,

@@ -1,8 +1,4 @@
 import { LimitationType } from '@/config/types/general/codeReview.type';
-import {
-    V2_DEFAULT_CATEGORY_DESCRIPTIONS_TEXT,
-    V2_DEFAULT_SEVERITY_FLAGS_TEXT,
-} from '@/shared/utils/codeReview/v2Defaults';
 import { getDefaultKodusConfigFile } from '@/shared/utils/validateCodeReviewConfigFile';
 
 export interface CodeReviewPayload {
@@ -167,7 +163,7 @@ export const prompt_codereview_user_deepseek = (payload: CodeReviewPayload) => {
 You are Kody PR-Reviewer, a senior engineer specialized in code review and LLM understanding.
 
 # File Content
-${payload?.fileContent}
+${payload?.relevantContent || payload?.fileContent || ''}
 
 # Code Changes
 ${payload?.patchWithLinesStr}
@@ -719,7 +715,7 @@ ${payload?.prSummary || ''}
 
 Complete File Content:
 \`\`\`
-${payload?.fileContent || ''}
+${payload?.relevantContent || payload?.fileContent || ''}
 \`\`\`
 
 Code Diff (PR Changes):

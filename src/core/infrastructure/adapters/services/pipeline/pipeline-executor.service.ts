@@ -65,6 +65,7 @@ export class PipelineExecutor<TContext extends PipelineContext> {
                     context: PipelineExecutor.name,
                     serviceName: PipelineExecutor.name,
                     metadata: {
+                        task: (context as any)?.tasks ?? null,
                         ...context?.pipelineMetadata,
                         stage: stage.stageName,
                         correlationId: (context as any)?.correlationId ?? null,

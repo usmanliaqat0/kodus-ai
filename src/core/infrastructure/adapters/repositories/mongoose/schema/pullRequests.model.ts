@@ -168,3 +168,21 @@ export class PullRequestsModel extends CoreDocument {
 
 export const PullRequestsSchema =
     SchemaFactory.createForClass(PullRequestsModel);
+
+// Índice único para prevenir duplicação de PRs
+// Garante que não haverá dois PRs com mesmo número + repositório + organização
+// Usa repository.id (imutável) ao invés de name (pode ser renomeado)
+PullRequestsSchema.index(
+    { 'number': 1, 'repository.id': 1, 'organizationId': 1 },
+    {
+        unique: true,
+        sparse: false,
+        name: 'number_1_repository.id_1_organizationId_1',
+    },
+);
+
+// Índice de busca por repository.name (para queries que usam nome)
+PullRequestsSchema.index(
+    { 'number': 1, 'repository.name': 1, 'organizationId': 1 },
+    { name: 'idx_number_repo_name_org' },
+);

@@ -39,6 +39,7 @@ export class CodeAnalysisASTCleanupStage extends BasePipelineStage<CodeReviewPip
                 context.pullRequest,
                 context.platformType,
                 context.organizationAndTeamData,
+                context.tasks.astAnalysis.taskId,
             );
 
             return context;

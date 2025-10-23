@@ -29,6 +29,9 @@ const optionsDataBase: DataSourceOptions = {
     synchronize: false,
     cache: false,
     migrationsRun: false,
+    // Allow individual migrations to override transaction mode
+    // Required for CREATE INDEX CONCURRENTLY (must run outside transactions)
+    migrationsTransactionMode: 'each',
     entities: [
         join(
             __dirname,
@@ -40,9 +43,7 @@ const optionsDataBase: DataSourceOptions = {
 
 const mergedConfig = {
     ...optionsDataBase,
-    ...(['development', 'test'].includes(env)
-        ? {}
-        : optionsDataBaseProd),
+    ...(['development', 'test'].includes(env) ? {} : optionsDataBaseProd),
 };
 
 const optionsSeeder: SeederOptions = {
