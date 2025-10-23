@@ -498,21 +498,31 @@ export class ProcessFilesReview extends BasePipelineStage<CodeReviewPipelineCont
         baseContext: AnalysisContext,
     ): Promise<IFinalAnalysisResult & { file: FileChange }> {
         const { reviewModeResponse } = baseContext;
-        const { file, relevantContent, patchWithLinesStr } =
+        const { file, relevantContent, patchWithLinesStr, hasRelevantContent } =
             baseContext.fileChangeContext;
 
         try {
             const context: AnalysisContext = {
                 ...baseContext,
                 reviewModeResponse: reviewModeResponse,
-                fileChangeContext: { file, relevantContent, patchWithLinesStr },
+                fileChangeContext: {
+                    file,
+                    relevantContent,
+                    patchWithLinesStr,
+                    hasRelevantContent,
+                },
             };
 
             const standardAnalysisResult =
                 await this.codeAnalysisOrchestrator.executeStandardAnalysis(
                     context.organizationAndTeamData,
                     context.pullRequest.number,
-                    { file, relevantContent, patchWithLinesStr },
+                    {
+                        file,
+                        relevantContent,
+                        patchWithLinesStr,
+                        hasRelevantContent,
+                    },
                     reviewModeResponse,
                     context,
                 );

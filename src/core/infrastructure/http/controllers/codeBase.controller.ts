@@ -25,6 +25,7 @@ import {
     CheckPolicies,
 } from '../../adapters/services/permissions/policy.guard';
 import { checkPermissions } from '../../adapters/services/permissions/policy.handlers';
+import { BackoffPresets } from '@/shared/utils/polling';
 
 function replacer(key: any, value: any) {
     if (value instanceof Map) {
@@ -91,10 +92,20 @@ export class CodeBaseController {
                 body.filePaths || [],
             );
 
-        await this.codeASTAnalysisService.awaitTask(taskId, {
-            organizationId: this.request.user?.organization.uuid,
-            teamId,
-        });
+        // Heavy task: linear backoff 5s, 10s, 15s... up to 60s
+        await this.codeASTAnalysisService.awaitTask(
+            taskId,
+            {
+                organizationId: this.request.user?.organization.uuid,
+                teamId,
+            },
+            {
+                timeout: 720000, // 12 minutes - AST analysis is a heavy task
+                initialInterval: BackoffPresets.HEAVY_TASK.baseInterval,
+                maxInterval: BackoffPresets.HEAVY_TASK.maxInterval,
+                useExponentialBackoff: false, // Linear mode
+            },
+        );
 
         const result = taskId;
 
@@ -148,6 +159,7 @@ export class CodeBaseController {
             teamId: string;
             diff: string;
             filePath: string;
+            taskId: string;
         },
         @Res({ passthrough: true }) res: Response,
     ): Promise<StreamableFile> {
@@ -162,6 +174,7 @@ export class CodeBaseController {
             teamId,
             diff,
             filePath,
+            taskId,
         } = body;
 
         const result =
@@ -183,11 +196,12 @@ export class CodeBaseController {
                 },
                 diff,
                 filePath,
+                taskId,
             );
 
         // O resultado já é uma string regular
         const tempFilePath = join(__dirname, `temp-${uuidv4()}.txt`);
-        writeFileSync(tempFilePath, result);
+        writeFileSync(tempFilePath, result.content);
 
         // Define os cabeçalhos para a resposta
         res.set({

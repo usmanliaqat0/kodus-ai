@@ -80,6 +80,7 @@ export type AnalysisContext = {
         astAnalysis?: {
             taskId: string;
             status?: TaskStatus;
+            hasRelevantContent?: boolean;
         };
     };
     correlationId: string;
@@ -178,6 +179,7 @@ export type FileChangeContext = {
     file: FileChange;
     relevantContent?: string | null;
     patchWithLinesStr?: string;
+    hasRelevantContent?: boolean;
 };
 
 export type Comment = {

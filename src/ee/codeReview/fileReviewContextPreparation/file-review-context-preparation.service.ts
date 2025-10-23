@@ -21,6 +21,7 @@ import { IAIAnalysisService } from '@/core/domain/codeBase/contracts/AIAnalysisS
 import { LLM_ANALYSIS_SERVICE_TOKEN } from '@/core/infrastructure/adapters/services/codeBase/llmAnalysis.service';
 import { TaskStatus } from '@/ee/kodyAST/codeASTAnalysis.service';
 import { BYOKConfig, LLMModelProvider } from '@kodus/kodus-common/llm';
+import { BackoffPresets } from '@/shared/utils/polling';
 
 /**
  * Enterprise (cloud) implementation of the file review context preparation service
@@ -39,6 +40,18 @@ export class FileReviewContextPreparation extends BaseFileReviewContextPreparati
         protected readonly logger: PinoLoggerService,
     ) {
         super(logger);
+    }
+
+    /**
+     * Get backoff configuration for heavy AST tasks
+     * Uses linear backoff: 5s, 10s, 15s, 20s... up to 60s
+     */
+    private getHeavyTaskBackoffConfig() {
+        return {
+            initialInterval: BackoffPresets.HEAVY_TASK.baseInterval,
+            maxInterval: BackoffPresets.HEAVY_TASK.maxInterval,
+            useExponentialBackoff: false, // Linear mode
+        };
     }
 
     /**
@@ -110,7 +123,7 @@ export class FileReviewContextPreparation extends BaseFileReviewContextPreparati
         let fileContext: AnalysisContext = baseContext.fileContext;
 
         const isHeavyMode =
-            fileContext.reviewModeResponse === ReviewModeResponse.HEAVY_MODE;
+            fileContext.reviewModeResponse !== ReviewModeResponse.HEAVY_MODE;
 
         const hasASTAnalysisTask =
             fileContext.tasks.astAnalysis.taskId &&
@@ -128,11 +141,13 @@ export class FileReviewContextPreparation extends BaseFileReviewContextPreparati
 
         if (shouldRunAST) {
             try {
+                // Heavy task: linear backoff 5s, 10s, 15s... up to 60s
                 const astTaskRes = await this.astService.awaitTask(
                     fileContext.tasks.astAnalysis.taskId,
                     fileContext.organizationAndTeamData,
                     {
-                        timeout: 600000, // 10 minutes
+                        timeout: 720000, // 12 minutes
+                        ...this.getHeavyTaskBackoffConfig(),
                     },
                 );
 
@@ -148,6 +163,7 @@ export class FileReviewContextPreparation extends BaseFileReviewContextPreparati
                         metadata: {
                             ...fileContext?.organizationAndTeamData,
                             filename: file.filename,
+                            task: fileContext.tasks.astAnalysis,
                         },
                     });
 
@@ -175,13 +191,16 @@ export class FileReviewContextPreparation extends BaseFileReviewContextPreparati
                         fileContext.organizationAndTeamData,
                         patchWithLinesStr,
                         file.filename,
+                        fileContext.tasks.astAnalysis.taskId,
                     );
 
+                // Heavy task: linear backoff 5s, 10s, 15s... up to 60s
                 const impactTaskRes = await this.astService.awaitTask(
                     taskId,
                     fileContext.organizationAndTeamData,
                     {
-                        timeout: 600000, // 10 minutes
+                        timeout: 720000, // 12 minutes
+                        ...this.getHeavyTaskBackoffConfig(),
                     },
                 );
 
@@ -197,6 +216,7 @@ export class FileReviewContextPreparation extends BaseFileReviewContextPreparati
                         metadata: {
                             ...fileContext?.organizationAndTeamData,
                             filename: file.filename,
+                            task: { taskId, impactTaskRes },
                         },
                     });
                     return { fileContext };
@@ -207,6 +227,7 @@ export class FileReviewContextPreparation extends BaseFileReviewContextPreparati
                     fileContext.pullRequest,
                     fileContext.platformType,
                     fileContext.organizationAndTeamData,
+                    taskId,
                 );
 
                 // Creates a new context by combining the fileContext with the AST analysis
@@ -249,7 +270,11 @@ export class FileReviewContextPreparation extends BaseFileReviewContextPreparati
     protected async getRelevantFileContent(
         file: FileChange,
         context: AnalysisContext,
-    ): Promise<{ relevantContent: string | null; taskStatus?: TaskStatus }> {
+    ): Promise<{
+        relevantContent: string | null;
+        taskStatus?: TaskStatus;
+        hasRelevantContent?: boolean;
+    }> {
         try {
             const { taskId } = context.tasks.astAnalysis;
 
@@ -266,15 +291,18 @@ export class FileReviewContextPreparation extends BaseFileReviewContextPreparati
 
                 return {
                     relevantContent: file.fileContent || file.content || null,
+                    hasRelevantContent: false,
                     taskStatus: TaskStatus.TASK_STATUS_FAILED,
                 };
             }
 
+            // Heavy task: linear backoff 5s, 10s, 15s... up to 60s
             const taskRes = await this.astService.awaitTask(
                 taskId,
                 context.organizationAndTeamData,
                 {
-                    timeout: 600000, // 10 minutes
+                    timeout: 720000, // 12 minutes
+                    ...this.getHeavyTaskBackoffConfig(),
                 },
             );
 
@@ -288,28 +316,32 @@ export class FileReviewContextPreparation extends BaseFileReviewContextPreparati
                     metadata: {
                         ...context?.organizationAndTeamData,
                         filename: file.filename,
+                        task: { taskId },
                     },
                 });
 
                 return {
                     relevantContent: file.fileContent || file.content || null,
+                    hasRelevantContent: false,
                     taskStatus:
                         taskRes?.task?.status || TaskStatus.TASK_STATUS_FAILED,
                 };
             }
 
-            const content = await this.astService.getRelatedContentFromDiff(
+            const { content } = await this.astService.getRelatedContentFromDiff(
                 context.repository,
                 context.pullRequest,
                 context.platformType,
                 context.organizationAndTeamData,
                 file.patch,
                 file.filename,
+                taskId,
             );
 
-            if (content) {
+            if (content && content?.length > 0) {
                 return {
                     relevantContent: content,
+                    hasRelevantContent: true,
                     taskStatus: taskRes?.task?.status,
                 };
             } else {
@@ -319,10 +351,12 @@ export class FileReviewContextPreparation extends BaseFileReviewContextPreparati
                     metadata: {
                         ...context?.organizationAndTeamData,
                         filename: file.filename,
+                        task: { taskId },
                     },
                 });
                 return {
                     relevantContent: file.fileContent || file.content || null,
+                    hasRelevantContent: false,
                     taskStatus: taskRes?.task?.status,
                 };
             }
@@ -338,6 +372,8 @@ export class FileReviewContextPreparation extends BaseFileReviewContextPreparati
             });
             return {
                 relevantContent: file.fileContent || file.content || null,
+                taskStatus: TaskStatus.TASK_STATUS_FAILED,
+                hasRelevantContent: false,
             };
         }
     }

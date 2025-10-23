@@ -125,8 +125,10 @@ export abstract class BaseFileReviewContextPreparation
 
         const relevantContentProm = this.getRelevantFileContent(file, context);
 
-        const [reviewModeResponse, { relevantContent, taskStatus }] =
-            await Promise.all([reviewModeProm, relevantContentProm]);
+        const [
+            reviewModeResponse,
+            { relevantContent, taskStatus, hasRelevantContent },
+        ] = await Promise.all([reviewModeProm, relevantContentProm]);
 
         const updatedContext: AnalysisContext = {
             ...context,
@@ -135,11 +137,13 @@ export abstract class BaseFileReviewContextPreparation
                 file,
                 relevantContent,
                 patchWithLinesStr,
+                hasRelevantContent,
             },
             tasks: {
                 ...context?.tasks,
                 astAnalysis: {
                     ...context?.tasks?.astAnalysis,
+                    hasRelevantContent,
                     status: taskStatus || TaskStatus.TASK_STATUS_FAILED,
                 },
             },
@@ -151,5 +155,9 @@ export abstract class BaseFileReviewContextPreparation
     protected abstract getRelevantFileContent(
         file: FileChange,
         context: AnalysisContext,
-    ): Promise<{ relevantContent: string | null; taskStatus?: TaskStatus }>;
+    ): Promise<{
+        relevantContent: string | null;
+        taskStatus?: TaskStatus;
+        hasRelevantContent?: boolean;
+    }>;
 }

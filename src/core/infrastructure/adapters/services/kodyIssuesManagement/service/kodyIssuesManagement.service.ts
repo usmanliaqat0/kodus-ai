@@ -666,9 +666,13 @@ export class KodyIssuesManagementService
         issuesConfigValue: IssueCreationConfig,
         allSuggestions: CodeSuggestion[],
     ): CodeSuggestion[] {
+        if (!issuesConfigValue) {
+            return allSuggestions;
+        }
+
         const { severityFilters, sourceFilters } = issuesConfigValue;
+
         return allSuggestions.filter((suggestion) => {
-            if (!issuesConfigValue) return true;
             const severity = suggestion?.severity as any;
 
             if (severityFilters?.minimumSeverity) {
