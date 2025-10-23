@@ -1,21 +1,21 @@
-export interface CockpitMetricsVisibility {
-    summary: {
-        deployFrequency: boolean;
-        prCycleTime: boolean;
-        kodySuggestions: boolean;
-        bugRatio: boolean;
-        prSize: boolean;
+export interface ICockpitMetricsVisibility {
+    readonly summary: {
+        readonly deployFrequency: boolean;
+        readonly prCycleTime: boolean;
+        readonly kodySuggestions: boolean;
+        readonly bugRatio: boolean;
+        readonly prSize: boolean;
     };
-    details: {
-        leadTimeBreakdown: boolean;
-        prCycleTime: boolean;
-        prsOpenedVsClosed: boolean;
-        prsMergedByDeveloper: boolean;
-        teamActivity: boolean;
+    readonly details: {
+        readonly leadTimeBreakdown: boolean;
+        readonly prCycleTime: boolean;
+        readonly prsOpenedVsClosed: boolean;
+        readonly prsMergedByDeveloper: boolean;
+        readonly teamActivity: boolean;
     };
 }
 
-export const DEFAULT_COCKPIT_METRICS_VISIBILITY: CockpitMetricsVisibility = {
+export const DEFAULT_COCKPIT_METRICS_VISIBILITY: ICockpitMetricsVisibility = {
     summary: {
         deployFrequency: true,
         prCycleTime: true,
@@ -31,4 +31,3 @@ export const DEFAULT_COCKPIT_METRICS_VISIBILITY: CockpitMetricsVisibility = {
         teamActivity: true,
     },
 };
-

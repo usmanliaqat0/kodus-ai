@@ -3,10 +3,12 @@ import {
     IOrganizationParametersService,
     ORGANIZATION_PARAMETERS_SERVICE_TOKEN,
 } from '@/core/domain/organizationParameters/contracts/organizationParameters.service.contract';
-import { CockpitMetricsVisibility, DEFAULT_COCKPIT_METRICS_VISIBILITY } from '@/core/domain/organizationParameters/interfaces/cockpit-metrics-visibility.interface';
+import { ICockpitMetricsVisibility, DEFAULT_COCKPIT_METRICS_VISIBILITY } from '@/core/domain/organizationParameters/interfaces/cockpit-metrics-visibility.interface';
 import { PinoLoggerService } from '@/core/infrastructure/adapters/services/logger/pino.service';
 import { OrganizationParametersKey } from '@/shared/domain/enums/organization-parameters-key.enum';
 import { Inject, Injectable } from '@nestjs/common';
+
+export const GET_COCKPIT_METRICS_VISIBILITY_USE_CASE_TOKEN = Symbol('GET_COCKPIT_METRICS_VISIBILITY_USE_CASE_TOKEN');
 
 @Injectable()
 export class GetCockpitMetricsVisibilityUseCase {
@@ -18,7 +20,7 @@ export class GetCockpitMetricsVisibilityUseCase {
 
     async execute(
         organizationAndTeamData: OrganizationAndTeamData,
-    ): Promise<CockpitMetricsVisibility> {
+    ): Promise<ICockpitMetricsVisibility> {
         try {
             const parameter =
                 await this.organizationParametersService.findByKey(
@@ -37,7 +39,7 @@ export class GetCockpitMetricsVisibilityUseCase {
                 return DEFAULT_COCKPIT_METRICS_VISIBILITY;
             }
 
-            return parameter.configValue as CockpitMetricsVisibility;
+            return parameter.configValue as ICockpitMetricsVisibility;
         } catch (error) {
             this.logger.error({
                 message: 'Error getting cockpit metrics visibility, returning default values',
