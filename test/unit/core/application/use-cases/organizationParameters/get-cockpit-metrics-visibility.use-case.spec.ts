@@ -1,9 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { GetCockpitMetricsVisibilityUseCase } from '@/core/application/use-cases/organizationParameters/get-cockpit-metrics-visibility.use-case';
+import { 
+    GetCockpitMetricsVisibilityUseCase,
+    GET_COCKPIT_METRICS_VISIBILITY_USE_CASE_TOKEN
+} from '@/core/application/use-cases/organizationParameters/get-cockpit-metrics-visibility.use-case';
 import { ORGANIZATION_PARAMETERS_SERVICE_TOKEN } from '@/core/domain/organizationParameters/contracts/organizationParameters.service.contract';
 import { PinoLoggerService } from '@/core/infrastructure/adapters/services/logger/pino.service';
 import { OrganizationParametersKey } from '@/shared/domain/enums/organization-parameters-key.enum';
-import { DEFAULT_COCKPIT_METRICS_VISIBILITY, CockpitMetricsVisibility } from '@/core/domain/organizationParameters/interfaces/cockpit-metrics-visibility.interface';
+import { DEFAULT_COCKPIT_METRICS_VISIBILITY, ICockpitMetricsVisibility } from '@/core/domain/organizationParameters/interfaces/cockpit-metrics-visibility.interface';
 import { OrganizationAndTeamData } from '@/config/types/general/organizationAndTeamData';
 
 describe('GetCockpitMetricsVisibilityUseCase', () => {
@@ -27,7 +30,10 @@ describe('GetCockpitMetricsVisibilityUseCase', () => {
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
-                GetCockpitMetricsVisibilityUseCase,
+                {
+                    provide: GET_COCKPIT_METRICS_VISIBILITY_USE_CASE_TOKEN,
+                    useClass: GetCockpitMetricsVisibilityUseCase,
+                },
                 {
                     provide: ORGANIZATION_PARAMETERS_SERVICE_TOKEN,
                     useValue: mockOrganizationParametersService,
@@ -40,7 +46,7 @@ describe('GetCockpitMetricsVisibilityUseCase', () => {
         }).compile();
 
         useCase = module.get<GetCockpitMetricsVisibilityUseCase>(
-            GetCockpitMetricsVisibilityUseCase,
+            GET_COCKPIT_METRICS_VISIBILITY_USE_CASE_TOKEN,
         );
     });
 
@@ -69,7 +75,7 @@ describe('GetCockpitMetricsVisibilityUseCase', () => {
         });
 
         it('should return custom visibility config when parameter exists', async () => {
-            const customConfig: CockpitMetricsVisibility = {
+            const customConfig: ICockpitMetricsVisibility = {
                 summary: {
                     deployFrequency: true,
                     prCycleTime: false,
@@ -103,7 +109,7 @@ describe('GetCockpitMetricsVisibilityUseCase', () => {
         });
 
         it('should return config with all metrics disabled when configured', async () => {
-            const allDisabledConfig: CockpitMetricsVisibility = {
+            const allDisabledConfig: ICockpitMetricsVisibility = {
                 summary: {
                     deployFrequency: false,
                     prCycleTime: false,

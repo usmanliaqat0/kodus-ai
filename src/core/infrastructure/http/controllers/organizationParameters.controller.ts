@@ -27,8 +27,12 @@ import {
 } from '../../adapters/services/permissions/policy.guard';
 import { checkPermissions } from '../../adapters/services/permissions/policy.handlers';
 import { DeleteByokConfigUseCase } from '@/core/application/use-cases/organizationParameters/delete-byok-config.use-case';
-import { GetCockpitMetricsVisibilityUseCase } from '@/core/application/use-cases/organizationParameters/get-cockpit-metrics-visibility.use-case';
-import { CockpitMetricsVisibility } from '@/core/domain/organizationParameters/interfaces/cockpit-metrics-visibility.interface';
+import { 
+    GetCockpitMetricsVisibilityUseCase,
+    GET_COCKPIT_METRICS_VISIBILITY_USE_CASE_TOKEN
+} from '@/core/application/use-cases/organizationParameters/get-cockpit-metrics-visibility.use-case';
+import { ICockpitMetricsVisibility } from '@/core/domain/organizationParameters/interfaces/cockpit-metrics-visibility.interface';
+import { Inject } from '@nestjs/common';
 
 @Controller('organization-parameters')
 export class OrgnizationParametersController {
@@ -38,6 +42,7 @@ export class OrgnizationParametersController {
         private readonly getModelsByProviderUseCase: GetModelsByProviderUseCase,
         private readonly providerService: ProviderService,
         private readonly deleteByokConfigUseCase: DeleteByokConfigUseCase,
+        @Inject(GET_COCKPIT_METRICS_VISIBILITY_USE_CASE_TOKEN)
         private readonly getCockpitMetricsVisibilityUseCase: GetCockpitMetricsVisibilityUseCase,
     ) {}
 
@@ -121,7 +126,7 @@ export class OrgnizationParametersController {
     )
     public async getCockpitMetricsVisibility(
         @Query('organizationId') organizationId: string,
-    ): Promise<CockpitMetricsVisibility> {
+    ): Promise<ICockpitMetricsVisibility> {
         return await this.getCockpitMetricsVisibilityUseCase.execute({
             organizationId,
         });
@@ -137,7 +142,7 @@ export class OrgnizationParametersController {
         body: {
             organizationId: string;
             teamId?: string;
-            config: CockpitMetricsVisibility;
+            config: ICockpitMetricsVisibility;
         },
     ) {
         return await this.createOrUpdateOrganizationParametersUseCase.execute(
