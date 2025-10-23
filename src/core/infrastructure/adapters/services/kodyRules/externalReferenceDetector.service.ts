@@ -86,7 +86,13 @@ export class ExternalReferenceDetectorService {
                 },
             });
 
-            const ruleHash = this.calculateRuleHash(params.ruleText);
+            let ruleHash: string;
+            try {
+                ruleHash = this.calculateRuleHash(params.ruleText);
+            } catch {
+                ruleHash = 'hash_calculation_failed';
+            }
+            
             return {
                 references: [],
                 syncErrors: [
