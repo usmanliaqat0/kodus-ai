@@ -1918,10 +1918,10 @@
   resolved "https://registry.npmjs.org/@keyv/serialize/-/serialize-1.1.1.tgz#0c01dd3a3483882af7cf3878d4e71d505c81fc4a"
   integrity sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==
 
-"@kodus/flow@0.1.22":
-  version "0.1.22"
-  resolved "https://us-central1-npm.pkg.dev/kodus-infra-prod/kodus-pkg/@kodus/flow/-/@kodus/flow-0.1.22.tgz#3b5c5a55e0990123153eda4b67f4706bbb1085f5"
-  integrity sha512-NCMbMvsW4uHKrB1qbZyxirGzqE1+X28qITNk99K2BUue+naIQCpo23pQTrfSRRppmANZj6hqQPzEQEhsFAu3jw==
+"@kodus/flow@0.1.23":
+  version "0.1.23"
+  resolved "https://us-central1-npm.pkg.dev/kodus-infra-prod/kodus-pkg/@kodus/flow/-/@kodus/flow-0.1.23.tgz#500d2bb196f95177c68aa65992eb7ba56964053f"
+  integrity sha512-3uswH9sD/lthyMxDGsYC1Mwy/DY/YQOuswFTUv2LNBPXEKeuTpRDkiWAlGYrPJC7iaXfSMsgGn2CJ5g2z4LeQg==
   dependencies:
     "@google/generative-ai" "^0.24.1"
     "@modelcontextprotocol/sdk" "^1.19.1"
