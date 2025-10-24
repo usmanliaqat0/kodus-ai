@@ -81,7 +81,7 @@
         "@gitbeaker/rest": "^43.5.0",
         "@golevelup/nestjs-rabbitmq": "^6.0.2",
         "@google/generative-ai": "^0.24.1",
-        "@kodus/flow": "0.1.23",
+        "@kodus/flow": "0.1.24",
         "@kodus/kodus-common": "1.2.16",
         "@langchain/anthropic": "^0.3.30",
         "@langchain/cohere": "^0.3.4",
