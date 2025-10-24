@@ -72,12 +72,24 @@ export class LoadExternalContextStage extends BasePipelineStage<CodeReviewPipeli
                 };
             }
 
+            const priorityMap = new Map(
+                configKeys.map((key, index) => [key, index]),
+            );
+
+            const sortedReferences = [...allReferences].sort((a, b) => {
+                const aPriority =
+                    priorityMap.get(a.configKey) ?? Number.MAX_SAFE_INTEGER;
+                const bPriority =
+                    priorityMap.get(b.configKey) ?? Number.MAX_SAFE_INTEGER;
+                return aPriority - bPriority;
+            });
+
             const externalContext =
                 await this.promptContextLoader.loadExternalContext({
                     organizationAndTeamData: context.organizationAndTeamData,
                     repository: context.repository,
                     pullRequest: context.pullRequest,
-                    allReferences,
+                    allReferences: sortedReferences,
                 });
 
             const totalReferencesLoaded = this.countLoadedReferences(
@@ -91,7 +103,7 @@ export class LoadExternalContextStage extends BasePipelineStage<CodeReviewPipeli
                     organizationId,
                     repositoryId,
                     prNumber: context.pullRequest.number,
-                    totalReferences: allReferences.length,
+                    totalReferences: sortedReferences.length,
                     totalReferencesLoaded,
                 },
             });
@@ -148,4 +160,3 @@ export class LoadExternalContextStage extends BasePipelineStage<CodeReviewPipeli
         return count;
     }
 }
-
