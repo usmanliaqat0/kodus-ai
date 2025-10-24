@@ -269,6 +269,37 @@ export class PromptContextLoaderService implements IPromptContextLoaderService {
             generation: {},
         };
 
+        const mergeEntries = (
+            current:
+                | { references: ILoadedFileReference[]; error?: string }
+                | undefined,
+            newReferences: ILoadedFileReference[],
+            errorMessage?: string,
+        ): { references: ILoadedFileReference[]; error?: string } => {
+            const hasCurrentReferences =
+                (current?.references?.length ?? 0) > 0;
+
+            if (hasCurrentReferences) {
+                return current as {
+                    references: ILoadedFileReference[];
+                    error?: string;
+                };
+            }
+
+            const finalError = errorMessage ?? current?.error;
+
+            if (finalError) {
+                return {
+                    references: newReferences,
+                    error: finalError,
+                };
+            }
+
+            return {
+                references: newReferences,
+            };
+        };
+
         for (const refDoc of allReferences) {
             const loadedReferences: ILoadedFileReference[] = refDoc.references
                 .map((ref) => {
@@ -293,72 +324,80 @@ export class PromptContextLoaderService implements IPromptContextLoaderService {
 
             switch (refDoc.sourceType) {
                 case PromptSourceType.CUSTOM_INSTRUCTION:
-                    context.customInstructions = {
-                        references: loadedReferences,
-                        error: errorMessage,
-                    };
+                    context.customInstructions = mergeEntries(
+                        context.customInstructions,
+                        loadedReferences,
+                        errorMessage,
+                    );
                     break;
 
                 case PromptSourceType.CATEGORY_BUG:
-                    context.categories.bug = {
-                        references: loadedReferences,
-                        error: errorMessage,
-                    };
+                    context.categories.bug = mergeEntries(
+                        context.categories.bug,
+                        loadedReferences,
+                        errorMessage,
+                    );
                     break;
 
                 case PromptSourceType.CATEGORY_PERFORMANCE:
-                    context.categories.performance = {
-                        references: loadedReferences,
-                        error: errorMessage,
-                    };
+                    context.categories.performance = mergeEntries(
+                        context.categories.performance,
+                        loadedReferences,
+                        errorMessage,
+                    );
                     break;
 
                 case PromptSourceType.CATEGORY_SECURITY:
-                    context.categories.security = {
-                        references: loadedReferences,
-                        error: errorMessage,
-                    };
+                    context.categories.security = mergeEntries(
+                        context.categories.security,
+                        loadedReferences,
+                        errorMessage,
+                    );
                     break;
 
                 case PromptSourceType.SEVERITY_CRITICAL:
                     if (!context.severity) context.severity = {};
-                    context.severity.critical = {
-                        references: loadedReferences,
-                        error: errorMessage,
-                    };
+                    context.severity.critical = mergeEntries(
+                        context.severity.critical,
+                        loadedReferences,
+                        errorMessage,
+                    );
                     break;
 
                 case PromptSourceType.SEVERITY_HIGH:
                     if (!context.severity) context.severity = {};
-                    context.severity.high = {
-                        references: loadedReferences,
-                        error: errorMessage,
-                    };
+                    context.severity.high = mergeEntries(
+                        context.severity.high,
+                        loadedReferences,
+                        errorMessage,
+                    );
                     break;
 
                 case PromptSourceType.SEVERITY_MEDIUM:
                     if (!context.severity) context.severity = {};
-                    context.severity.medium = {
-                        references: loadedReferences,
-                        error: errorMessage,
-                    };
+                    context.severity.medium = mergeEntries(
+                        context.severity.medium,
+                        loadedReferences,
+                        errorMessage,
+                    );
                     break;
 
                 case PromptSourceType.SEVERITY_LOW:
                     if (!context.severity) context.severity = {};
-                    context.severity.low = {
-                        references: loadedReferences,
-                        error: errorMessage,
-                    };
+                    context.severity.low = mergeEntries(
+                        context.severity.low,
+                        loadedReferences,
+                        errorMessage,
+                    );
                     break;
 
                 case PromptSourceType.GENERATION_MAIN:
-                    context.generation = {
-                        main: {
-                            references: loadedReferences,
-                            error: errorMessage,
-                        },
-                    };
+                    if (!context.generation) context.generation = {};
+                    context.generation.main = mergeEntries(
+                        context.generation.main,
+                        loadedReferences,
+                        errorMessage,
+                    );
                     break;
             }
         }
