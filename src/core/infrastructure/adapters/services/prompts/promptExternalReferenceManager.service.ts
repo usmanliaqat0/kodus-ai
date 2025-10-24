@@ -519,8 +519,11 @@ export class PromptExternalReferenceManagerService
                 PromptSourceType,
                 PromptExternalReferenceEntity
             >();
-            for (const ref of references) {
-                resultMap.set(ref.sourceType, ref);
+
+            if (references && Array.isArray(references)) {
+                for (const ref of references) {
+                    resultMap.set(ref.sourceType, ref);
+                }
             }
 
             return resultMap;

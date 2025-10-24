@@ -307,6 +307,8 @@ ${JSON.stringify(context?.suggestions, null, 2) || 'No suggestions provided'}
                             .setTemperature(0)
                             .addCallbacks(callbacks)
                             .addMetadata({
+                                hasRelevantContent:
+                                    baseContext?.hasRelevantContent,
                                 organizationId:
                                     baseContext?.organizationAndTeamData
                                         ?.organizationId,

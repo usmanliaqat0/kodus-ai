@@ -1,3 +1,4 @@
+import { createLogger } from '../../observability/logger.js';
 import {
     EngineTool,
     MCPAdapter,
@@ -59,6 +60,8 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
         maxRetries: config.maxRetries,
     });
 
+    const logger = createLogger('createMCPAdapter');
+
     let isConnected = false;
 
     const adapter: MCPAdapter = {
@@ -80,7 +83,22 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
                 }),
             );
 
-            await Promise.all(promises);
+            const results = await Promise.allSettled(promises);
+
+            const rejected = results.filter(
+                (result) => result.status === 'rejected',
+            );
+
+            if (rejected.length > 0) {
+                logger.warn(
+                    `${rejected.length} MCP server(s) failed to connect.`,
+                );
+
+                for (const result of rejected) {
+                    logger.error('MCP connection error:', result.reason);
+                }
+            }
+
             isConnected = true;
         },
 
