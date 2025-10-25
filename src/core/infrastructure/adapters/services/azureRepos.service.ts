@@ -85,7 +85,6 @@ export class AzureReposService
             ICodeManagementService,
             | 'getOrganizations'
             | 'getWorkflows'
-            | 'getListMembers'
             | 'getCommitsByReleaseMode'
             | 'getPullRequestsForRTTM'
             | 'getPullRequestReviewThreads'
@@ -201,6 +200,78 @@ export class AzureReposService
                 message: 'Error in getPullRequestAuthors',
                 context: 'AzureService',
                 error: err,
+                metadata: {
+                    organizationAndTeamData: params?.organizationAndTeamData,
+                },
+            });
+            return [];
+        }
+    }
+    async getListMembers(params: {
+        organizationAndTeamData: OrganizationAndTeamData;
+    }): Promise<{ name: string; id: string | number }[]> {
+        try {
+            const organizationAndTeamData = params?.organizationAndTeamData;
+
+            if (!organizationAndTeamData?.organizationId) {
+                return [];
+            }
+
+            const authDetails = await this.getAuthDetails(
+                organizationAndTeamData,
+            );
+
+            if (!authDetails?.orgName || !authDetails?.token) {
+                return [];
+            }
+
+            const members =
+                await this.azureReposRequestHelper.listOrganizationUsers({
+                    orgName: authDetails.orgName,
+                    token: authDetails.token,
+                });
+
+            if (!members || members.length === 0) {
+                return [];
+            }
+
+            const normalizedMembers = members
+                .map((member) => {
+                    const id =
+                        member?.descriptor ??
+                        member?.originId ??
+                        member?.principalName ??
+                        member?.mailAddress;
+                    const name =
+                        member?.displayName ??
+                        member?.principalName ??
+                        member?.mailAddress ??
+                        member?.originId ??
+                        id;
+
+                    if (!id || !name) {
+                        return null;
+                    }
+
+                    return {
+                        name,
+                        id,
+                    };
+                })
+                .filter(
+                    (
+                        member,
+                    ): member is { name: string; id: string | number } =>
+                        Boolean(member),
+                );
+
+            return normalizedMembers;
+        } catch (error) {
+            this.logger.error({
+                message: 'Error to get Azure DevOps members',
+                context: AzureReposService.name,
+                serviceName: 'AzureReposService getListMembers',
+                error,
                 metadata: {
                     organizationAndTeamData: params?.organizationAndTeamData,
                 },

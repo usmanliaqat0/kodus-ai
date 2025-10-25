@@ -927,6 +927,52 @@ export class AzureReposRequestHelper {
         return preferredUser ?? users[0] ?? null;
     }
 
+    async listOrganizationUsers(params: {
+        orgName: string;
+        token: string;
+    }): Promise<any[]> {
+        const instance = await this.azureRequest({
+            ...params,
+            useGraphApi: true,
+        });
+
+        const users: any[] = [];
+        let continuationToken: string | undefined;
+
+        do {
+            const requestConfig: {
+                params: Record<string, string>;
+                headers?: Record<string, string>;
+            } = {
+                params: {
+                    'api-version': '7.1-preview.1',
+                    subjectTypes: 'aad,msa,vss,svc',
+                },
+            };
+
+            if (continuationToken) {
+                requestConfig.headers = {
+                    'x-ms-continuationtoken': continuationToken,
+                };
+            }
+
+            const response = await instance.get('/_apis/graph/users', requestConfig);
+            users.push(...(response.data?.value ?? []));
+
+            const headerValue =
+                response.headers['x-ms-continuationtoken'] ??
+                response.headers['X-MS-ContinuationToken'];
+
+            if (Array.isArray(headerValue)) {
+                continuationToken = headerValue[0];
+            } else {
+                continuationToken = headerValue;
+            }
+        } while (continuationToken);
+
+        return users;
+    }
+
     async listRepositoryFiles(params: {
         orgName: string;
         token: string;
