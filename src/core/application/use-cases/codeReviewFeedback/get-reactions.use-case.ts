@@ -1,15 +1,14 @@
 import { IUseCase } from '@/shared/domain/interfaces/use-case.interface';
 import { Inject, Injectable } from '@nestjs/common';
 import { OrganizationAndTeamData } from '@/config/types/general/organizationAndTeamData';
-import { PullRequestWithFiles } from '@/core/domain/platformIntegrations/types/codeManagement/pullRequests.type';
 import { CodeManagementService } from '@/core/infrastructure/adapters/services/platformIntegration/codeManagement.service';
-import * as moment from 'moment-timezone';
-import { DeliveryStatus } from '@/core/domain/pullRequests/enums/deliveryStatus.enum';
+import { IPullRequestWithDeliveredSuggestions } from '@/core/domain/pullRequests/interfaces/pullRequests.interface';
 import {
     PULL_REQUESTS_SERVICE_TOKEN,
     IPullRequestsService,
 } from '@/core/domain/pullRequests/contracts/pullRequests.service.contracts';
-import { ICodeReviewFeedback } from '@/core/domain/codeReviewFeedback/interfaces/codeReviewFeedback.interface';
+import { PullRequestState } from '@/shared/domain/enums/pullRequestState.enum';
+import { PinoLoggerService } from '@/core/infrastructure/adapters/services/logger/pino.service';
 
 @Injectable()
 export class GetReactionsUseCase implements IUseCase {
@@ -18,100 +17,88 @@ export class GetReactionsUseCase implements IUseCase {
 
         @Inject(PULL_REQUESTS_SERVICE_TOKEN)
         private readonly pullRequestService: IPullRequestsService,
-    ) { }
 
-    async execute(organizationAndTeamData: OrganizationAndTeamData) {
-        const period = this.calculatePeriod();
+        private readonly logger: PinoLoggerService,
+    ) {}
 
-        const mergedPullRequests =
-            await this.codeManagementService.getPullRequestsWithFiles({
-                organizationAndTeamData: organizationAndTeamData,
-                filters: {
-                    period,
-                    prStatus: 'merged',
-                },
-            });
-
-        const closedPullRequests =
-            await this.codeManagementService.getPullRequestsWithFiles({
-                organizationAndTeamData: organizationAndTeamData,
-                filters: {
-                    period,
-                    prStatus: 'closed',
-                },
-            });
-
-        const allPullRequests = [...mergedPullRequests, ...closedPullRequests];
-
-        return await this.getReactions(
-            allPullRequests,
-            organizationAndTeamData,
-        );
-    }
-
-    private async getReactions(
-        pullRequests: PullRequestWithFiles[],
+    async execute(
         organizationAndTeamData: OrganizationAndTeamData,
-    ): Promise<ICodeReviewFeedback[]> {
-        const reactions: any[] = [];
+        automationExecutionsPRs: number[],
+    ) {
+        if (!automationExecutionsPRs?.length) {
+            return [];
+        }
+
+        const pullRequests =
+            await this.pullRequestService.findPullRequestsWithDeliveredSuggestions(
+                organizationAndTeamData.organizationId,
+                automationExecutionsPRs,
+                [PullRequestState.MERGED, PullRequestState.CLOSED],
+            );
 
         if (!pullRequests?.length) {
             return [];
         }
 
-        for (const pr of pullRequests) {
+        return await this.getReactions(pullRequests, organizationAndTeamData);
+    }
+
+    private async getReactions(
+        pullRequests: IPullRequestWithDeliveredSuggestions[],
+        organizationAndTeamData: OrganizationAndTeamData,
+    ) {
+        const reactionsPromises = pullRequests.map(async (pr) => {
+            if (!pr.suggestions?.length) {
+                return [];
+            }
+
+            const suggestionsByCommentId = new Map(
+                pr.suggestions.map((s) => [s.comment?.id, s]),
+            );
+
             const comments =
                 await this.codeManagementService.getPullRequestReviewComment({
-                    organizationAndTeamData: organizationAndTeamData,
+                    organizationAndTeamData,
                     filters: {
-                        repository: pr.repository,
-                        pullRequestNumber: pr.pull_number,
+                        repository: pr.repository.name,
+                        pullRequestNumber: pr.number,
                     },
                 });
 
-            const suggestions =
-                await this.pullRequestService.findSuggestionsByPR(
-                    organizationAndTeamData.organizationId,
-                    pr.pull_number,
-                    DeliveryStatus.SENT,
-                );
+            const commentsLinkedToSuggestions = comments.filter((comment) => {
+                const commentId = comment?.threadId
+                    ? comment.threadId
+                    : comment?.notes?.[0]?.id || comment?.id;
+                return suggestionsByCommentId.has(commentId);
+            });
 
-            if (!suggestions?.length) {
-                continue;
+            if (!commentsLinkedToSuggestions.length) {
+                return [];
             }
-
-            const commentsLinkedToSuggestions = comments.filter((comment) =>
-                suggestions?.some(
-                    (suggestion) => {
-                        // We dont save the commentId for azure, but the threadId.
-                        if (comment?.threadId) {
-                            return suggestion?.comment?.id === comment?.threadId;
-                        }
-                        else {
-                            return suggestion?.comment?.id === (comment?.notes?.[0]?.id || comment?.id);
-                        }
-                    }
-                ),
-            );
 
             const reactionsInComments =
                 await this.codeManagementService.countReactions({
-                    organizationAndTeamData: organizationAndTeamData,
+                    organizationAndTeamData,
                     comments: commentsLinkedToSuggestions,
-                    pr,
+                    pr: {
+                        pull_number: pr.number,
+                        repository: pr.repository.name,
+                    },
                 });
 
-            // Adds the suggestionId to each reaction
-            const reactionsWithSuggestionId = reactionsInComments
-                .filter((reaction) =>
-                    suggestions.some(
-                        (s) => s?.comment?.id === reaction.comment.id,
-                    ),
-                )
+            if (!reactionsInComments?.length) {
+                return [];
+            }
+
+            return reactionsInComments
                 .map((reaction) => {
-                    const suggestion = suggestions.find(
-                        (s) => s?.comment?.id === reaction.comment.id,
+                    const suggestion = suggestionsByCommentId.get(
+                        reaction.comment.id,
                     );
+                    if (!suggestion) {
+                        return null;
+                    }
+
                     return {
                         reactions: reaction.reactions,
                         comment: {
@@ -119,40 +106,53 @@ export class GetReactionsUseCase implements IUseCase {
                             pullRequestReviewId:
                                 reaction.comment?.pull_request_review_id,
                         },
-                        suggestionId: suggestion?.id,
+                        suggestionId: suggestion.id,
                         pullRequest: {
                             id: reaction.pullRequest.id,
                             number: reaction.pullRequest.number,
                             repository: {
                                 id:
                                     reaction?.pullRequest?.repository?.id ||
-                                    pr?.repositoryData?.id,
+                                    pr.repository.id,
                                 fullName:
-                                    pr?.repositoryData?.fullName ||
-                                    reaction?.pullRequest?.repository?.fullName,
+                                    reaction?.pullRequest?.repository
+                                        ?.fullName || pr.repository.name,
                             },
                         },
                         organizationId: organizationAndTeamData.organizationId,
                     };
-                });
+                })
+                .filter((reaction) => reaction !== null);
+        });
 
-            reactions.push(...reactionsWithSuggestionId);
+        const reactionsResults = await Promise.all(reactionsPromises);
+        const flattenedReactions = reactionsResults.flat();
+
+        const prsWithoutReactions = pullRequests.filter((pr, index) => {
+            return reactionsResults[index].length === 0;
+        });
+
+        if (prsWithoutReactions.length > 0) {
+            this.logger.log({
+                message: 'PRs without reactions summary',
+                context: GetReactionsUseCase.name,
+                metadata: {
+                    organizationId: organizationAndTeamData.organizationId,
+                    totalPRs: pullRequests.length,
+                    prsWithReactions:
+                        pullRequests.length - prsWithoutReactions.length,
+                    prsWithoutReactions: prsWithoutReactions.length,
+                    prsWithoutReactionsDetails: prsWithoutReactions.map(
+                        (pr) => ({
+                            prNumber: pr.number,
+                            repository: pr.repository.name,
+                            suggestionsCount: pr.suggestions?.length || 0,
+                        }),
+                    ),
+                },
+            });
         }
 
-        return reactions;
-    }
-
-    private calculatePeriod() {
-        const now = new Date();
-        const endDate = now;
-        const startDate = new Date(now);
-
-        startDate.setDate(startDate.getDate() - 1);
-        startDate.setHours(0, 0, 0, 0);
-
-        return {
-            startDate: moment(startDate).format('YYYY-MM-DD HH:mm'),
-            endDate: moment(endDate).format('YYYY-MM-DD HH:mm'),
-        };
+        return flattenedReactions;
     }
 }

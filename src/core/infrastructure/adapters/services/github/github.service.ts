@@ -88,7 +88,10 @@ import {
     RepositoryFile,
     RepositoryFileWithContent,
 } from '@/core/domain/platformIntegrations/types/codeManagement/repositoryFile.type';
-import { isFileMatchingGlob, isFileMatchingGlobCaseInsensitive } from '@/shared/utils/glob-utils';
+import {
+    isFileMatchingGlob,
+    isFileMatchingGlobCaseInsensitive,
+} from '@/shared/utils/glob-utils';
 import pLimit from 'p-limit';
 import { MCPManagerService } from '../../mcp/services/mcp-manager.service';
 
@@ -4007,7 +4010,7 @@ export class GithubService
                 owner: githubAuthDetail?.org,
                 repo: filters?.repository?.name ?? filters?.repository,
                 pull_number: filters?.pullRequestNumber,
-                per_page: 200, // You can adjust this value as needed
+                per_page: 200,
             },
         );
 

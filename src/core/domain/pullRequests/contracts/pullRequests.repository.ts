@@ -59,7 +59,7 @@ export interface IPullRequestsRepository {
     findPullRequestsWithDeliveredSuggestions(
         organizationId: string,
         prNumbers: number[],
-        status: string,
+        status: string | string[],
     ): Promise<IPullRequestWithDeliveredSuggestions[]>;
     findByOrganizationAndRepositoryWithStatusAndSyncedFlag(
         organizationId: string,
