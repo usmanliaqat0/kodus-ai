@@ -127,9 +127,9 @@ export class GetCodeManagementMemberListUseCase implements IUseCase {
         }
 
         const rawId =
+            member?.descriptor ??
             member?.id ??
             member?.uuid ??
-            member?.descriptor ??
             member?.originId ??
             member?.email ??
             member?.login ??
