@@ -21,11 +21,17 @@ export class CodeReviewFeedbackController {
 
     @Post('reactions')
     async saveReactions(
-        @Body() body: { organizationId: string; teamId: string },
+        @Body()
+        body: {
+            organizationId: string;
+            teamId: string;
+            automationExecutionsPRs: number[];
+        },
     ): Promise<CodeReviewFeedbackEntity[]> {
         return await this.saveCodeReviewFeedbackUseCase.execute({
             organizationId: body.organizationId,
             teamId: body.teamId,
+            automationExecutionsPRs: body.automationExecutionsPRs,
         });
     }
 }

@@ -17,11 +17,19 @@ export class SaveCodeReviewFeedbackUseCase implements IUseCase {
         private readonly logger: PinoLoggerService,
     ) {}
 
-    async execute(
-        organizationAndTeamData: OrganizationAndTeamData,
-    ): Promise<CodeReviewFeedbackEntity[]> {
+    async execute(payload: {
+        organizationId: string;
+        teamId: string;
+        automationExecutionsPRs: number[];
+    }): Promise<CodeReviewFeedbackEntity[]> {
         try {
-            const reactions = await this.getReactions(organizationAndTeamData);
+            const reactions = await this.getReactions(
+                {
+                    organizationId: payload.organizationId,
+                    teamId: payload.teamId,
+                },
+                payload.automationExecutionsPRs,
+            );
 
             return await this.codeReviewFeedbackService.bulkCreate(
                 reactions as Omit<ICodeReviewFeedback, 'uuid'>[],
@@ -31,7 +39,7 @@ export class SaveCodeReviewFeedbackUseCase implements IUseCase {
                 message: 'Error save code review feedback',
                 context: SaveCodeReviewFeedbackUseCase.name,
                 error,
-                metadata: { organizationAndTeamData },
+                metadata: { payload },
             });
             throw error;
         }
@@ -39,7 +47,11 @@ export class SaveCodeReviewFeedbackUseCase implements IUseCase {
 
     private async getReactions(
         organizationAndTeamData: OrganizationAndTeamData,
+        automationExecutionsPRs: number[],
     ) {
-        return this.getReactionsUseCase.execute(organizationAndTeamData);
+        return this.getReactionsUseCase.execute(
+            organizationAndTeamData,
+            automationExecutionsPRs,
+        );
     }
 }

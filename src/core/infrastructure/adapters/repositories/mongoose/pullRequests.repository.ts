@@ -235,16 +235,20 @@ export class PullRequestsRepository implements IPullRequestsRepository {
     async findPullRequestsWithDeliveredSuggestions(
         organizationId: string,
         prNumbers: number[],
-        status: string,
+        status: string | string[],
     ): Promise<IPullRequestWithDeliveredSuggestions[]> {
         try {
+            const statusFilter = Array.isArray(status)
+                ? { $in: status }
+                : status;
+
             const result = await this.pullRequestsModel
                 .aggregate([
                     {
                         $match: {
                             organizationId: organizationId,
                             number: { $in: prNumbers },
-                            status: status,
+                            status: statusFilter,
                         },
                     },
                     {
