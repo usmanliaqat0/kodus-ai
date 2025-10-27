@@ -117,6 +117,8 @@ export class RunCodeReviewAutomationUseCase {
                 repository,
                 platformType,
                 userGitId:
+                    // in azure repos, the user id is the descriptor
+                    mappedUsers?.user?.descriptor?.toString() ||
                     mappedUsers?.user?.id?.toString() ||
                     mappedUsers?.user?.uuid?.toString(),
                 prNumber: pullRequest?.number,

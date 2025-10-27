@@ -1322,7 +1322,10 @@ export class AzureReposService
                                 organizationAndTeamData,
                                 username: authorName,
                             });
-                            userId = user?.originId ?? null;
+                            userId =
+                                user?.descriptor ??
+                                user?.originId ??
+                                null;
                         } catch {
                             userId = null;
                         }
