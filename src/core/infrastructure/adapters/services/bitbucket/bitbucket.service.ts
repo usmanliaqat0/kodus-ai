@@ -47,6 +47,7 @@ import { decrypt, encrypt } from '@/shared/utils/crypto';
 import { PullRequestState } from '@/shared/domain/enums/pullRequestState.enum';
 import { safelyParseMessageContent } from '@/shared/utils/safelyParseMessageContent';
 import { PromptService } from '../prompt.service';
+import { CacheService } from '@/shared/utils/cache/cache.service';
 import moment from 'moment';
 import { ParametersKey } from '@/shared/domain/enums/parameters-key.enum';
 import { Commit } from '@/config/types/general/commit.type';
@@ -111,8 +112,11 @@ export class BitbucketService
         private readonly logger: PinoLoggerService,
 
         private readonly configService: ConfigService,
+        private readonly cacheService: CacheService,
         private readonly mcpManagerService?: MCPManagerService,
     ) {}
+
+    private readonly USER_CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
     async getPullRequestAuthors(params: {
         organizationAndTeamData: OrganizationAndTeamData;
@@ -217,6 +221,7 @@ export class BitbucketService
                 .listActivitiesForRepo({
                     repo_slug: `{${repository.id}}`,
                     workspace: `{${workspace}}`,
+                    pagelen: 100,
                 })
                 .then((res) => this.getPaginatedResults(bitbucketAPI, res));
 
@@ -787,7 +792,7 @@ export class BitbucketService
             const bitbucketAPI = this.instanceBitbucketApi(bitbucketAuthDetail);
 
             const workspaces = await bitbucketAPI.workspaces
-                .getWorkspaces({})
+                .getWorkspaces({ pagelen: 100 })
                 .then((res) => this.getPaginatedResults(bitbucketAPI, res));
 
             const workspacesWithRepos = await Promise.all(
@@ -795,6 +800,7 @@ export class BitbucketService
                     bitbucketAPI.repositories
                         .list({
                             workspace: `${workspace.uuid}`,
+                            pagelen: 100,
                         })
                         .then((res) =>
                             this.getPaginatedResults(bitbucketAPI, res),
@@ -887,6 +893,7 @@ export class BitbucketService
                         .list({
                             repo_slug: `{${repo.id}}`,
                             workspace: `{${repo.workspaceId}}`,
+                            pagelen: 100,
                         })
                         .then((res) =>
                             this.getPaginatedResults(bitbucketAPI, res),
@@ -989,7 +996,9 @@ export class BitbucketService
 
                             return null;
                         })
-                        .filter((workspace): workspace is string => !!workspace),
+                        .filter(
+                            (workspace): workspace is string => !!workspace,
+                        ),
                 ),
             );
 
@@ -1005,14 +1014,18 @@ export class BitbucketService
                             pagelen: 100,
                         })
                         .then((res) =>
-                            this.getPaginatedResults<
-                                Schema.WorkspaceMembership
-                            >(bitbucketAPI, res),
+                            this.getPaginatedResults<Schema.WorkspaceMembership>(
+                                bitbucketAPI,
+                                res,
+                            ),
                         ),
                 ),
             );
 
-            const uniqueMembers = new Map<string, { name: string; id: string }>();
+            const uniqueMembers = new Map<
+                string,
+                { name: string; id: string }
+            >();
 
             allMembers.forEach((memberships) => {
                 memberships.forEach((membership) => {
@@ -1208,6 +1221,7 @@ export class BitbucketService
                         .list({
                             repo_slug: `{${repo.id}}`,
                             workspace: `{${repo.workspaceId}}`,
+                            pagelen: 100,
                         })
                         .then((res) =>
                             this.getPaginatedResults(bitbucketAPI, res),
@@ -1339,6 +1353,7 @@ export class BitbucketService
                             repo_slug: `{${repo.id}}`,
                             workspace: `{${repo.workspaceId}}`,
                             state: normalizedStatus,
+                            pagelen: 100,
                         })
                         .then((res) =>
                             this.getPaginatedResults(bitbucketAPI, res),
@@ -1462,6 +1477,7 @@ export class BitbucketService
                             repo_slug: `{${repo.id}}`,
                             workspace: `{${repo.workspaceId}}`,
                             q: `(state = 'MERGED' OR state = 'DECLINED')${query}`,
+                            pagelen: 100,
                         })
                         .then((res) =>
                             this.getPaginatedResults(bitbucketAPI, res),
@@ -2066,16 +2082,18 @@ export class BitbucketService
             const bitbucketAPI =
                 this.instanceBitbucketApi(bitbucketAuthDetails);
 
-            const commits = await bitbucketAPI.repositories
-                .listCommits({
-                    repo_slug: `{${repo.id}}`,
-                    workspace: `{${repo.workspaceId}}`,
-                    include:
-                        pullRequest.head?.ref || pullRequest.base?.ref || '',
-                })
-                .then((res) => this.getPaginatedResults(bitbucketAPI, res));
+            const commits = await bitbucketAPI.repositories.listCommits({
+                repo_slug: `{${repo.id}}`,
+                workspace: `{${repo.workspaceId}}`,
+                pagelen: 1,
+                include: pullRequest.head?.ref || pullRequest.base?.ref || '',
+            });
 
-            const commit = commits[0];
+            const commit = commits?.data?.values?.[0];
+
+            if (!commit) {
+                return null;
+            }
 
             const fileContent = await bitbucketAPI.source
                 .read({
@@ -2102,6 +2120,7 @@ export class BitbucketService
                     params,
                 },
             });
+            return null;
         }
     }
 
@@ -2555,6 +2574,7 @@ export class BitbucketService
                     pull_request_id: filters.pullRequestNumber,
                     repo_slug: `{${filters.repository.id}}`,
                     workspace: `{${workspace}}`,
+                    pagelen: 100,
                 })
                 .then((res) => this.getPaginatedResults(bitbucketAPI, res));
 
@@ -2921,6 +2941,7 @@ export class BitbucketService
                     .listForRepo({
                         repo_slug: `{${repo.id}}`,
                         workspace: `{${repo.workspaceId}}`,
+                        pagelen: 100,
                     })
                     .then((res) => this.getPaginatedResults(bitbucketAPI, res));
 
@@ -3471,6 +3492,7 @@ export class BitbucketService
                     repo_slug: `{${repository.id}}`,
                     workspace: `{${workspace}}`,
                     pull_request_id: prNumber,
+                    pagelen: 100,
                 })
                 .then((res) => this.getPaginatedResults(bitbucketAPI, res));
 
@@ -3684,6 +3706,7 @@ export class BitbucketService
                     pull_request_id: prNumber,
                     repo_slug: `{${repository.id}}`,
                     workspace: `{${workspace}}`,
+                    pagelen: 100,
                 })
                 .then((res) => this.getPaginatedResults(bitbucketAPI, res));
 
@@ -3752,6 +3775,7 @@ export class BitbucketService
                     workspace: `{${workspace}}`,
                     q: queryString,
                     fields: '+values.participants,+values.reviewers,+values.draft',
+                    pagelen: 100,
                 })
                 .then((res) => this.getPaginatedResults(bitbucketAPI, res));
 
@@ -3782,6 +3806,21 @@ export class BitbucketService
             return null;
         }
 
+        const cacheKey = `bitbucket-user-${organizationAndTeamData.organizationId}-${username}`;
+
+        const cached = await this.cacheService.getFromCache<any>(cacheKey);
+        if (cached !== null) {
+            this.logger.debug({
+                message: `User data retrieved from cache`,
+                context: BitbucketService.name,
+                metadata: {
+                    username,
+                    organizationId: organizationAndTeamData.organizationId,
+                },
+            });
+            return cached;
+        }
+
         try {
             const bitbucketAuthDetails = await this.getAuthDetails(
                 organizationAndTeamData,
@@ -3797,7 +3836,15 @@ export class BitbucketService
                 })
                 .then((res) => res.data);
 
-            return user ?? null;
+            const userData = user ?? null;
+
+            await this.cacheService.addToCache(
+                cacheKey,
+                userData,
+                this.USER_CACHE_TTL,
+            );
+
+            return userData;
         } catch (error: any) {
             if (error?.response?.status === 404) {
                 this.logger.warn({
@@ -3805,6 +3852,14 @@ export class BitbucketService
                     context: BitbucketService.name,
                     metadata: { username, organizationAndTeamData },
                 });
+
+                // Cache null result to avoid repeated 404 calls
+                await this.cacheService.addToCache(
+                    cacheKey,
+                    null,
+                    this.USER_CACHE_TTL,
+                );
+
                 return null;
             }
 
@@ -3855,6 +3910,7 @@ export class BitbucketService
                     workspace: `{${workspace}}`,
                     pull_request_id: prNumber,
                     fields: '+values.resolution.type,+values.resolution.+values.id,+values.pullrequest',
+                    pagelen: 100,
                 })
                 .then((res) => this.getPaginatedResults(bitbucketAPI, res));
 
@@ -3934,7 +3990,7 @@ export class BitbucketService
 
                         // Check for thumbs up reaction
                         if (
-                            replyBody.includes(thumbsUpText) &&
+                            replyBody?.includes(thumbsUpText) &&
                             !userReaction.thumbsUp
                         ) {
                             comment.thumbsUp++;
@@ -3943,7 +3999,7 @@ export class BitbucketService
 
                         // Check for thumbs down reaction
                         if (
-                            replyBody.includes(thumbsDownText) &&
+                            replyBody?.includes(thumbsDownText) &&
                             !userReaction.thumbsDown
                         ) {
                             comment.thumbsDown++;
@@ -4008,6 +4064,10 @@ export class BitbucketService
         bitbucketAPI: APIClient,
         response: BitbucketResponse<{ values?: T[] }>,
     ): Promise<T[]> {
+        if (!response.data.values || !Array.isArray(response.data.values)) {
+            return [];
+        }
+
         let allResults = [...response.data.values];
         let currentResults = response.data;
 
@@ -4015,7 +4075,9 @@ export class BitbucketService
             currentResults = (await bitbucketAPI.getNextPage(currentResults))
                 .data;
 
-            allResults = allResults.concat(currentResults.values);
+            if (currentResults.values && Array.isArray(currentResults.values)) {
+                allResults = allResults.concat(currentResults.values);
+            }
         }
 
         return allResults;
@@ -4034,6 +4096,10 @@ export class BitbucketService
         response: BitbucketResponse<{ values?: T[] }>,
         limit: number = 100,
     ): Promise<T[]> {
+        if (!response.data.values || !Array.isArray(response.data.values)) {
+            return [];
+        }
+
         let allResults = [...response.data.values];
         let currentResults = response.data;
 
@@ -4049,7 +4115,9 @@ export class BitbucketService
             currentResults = (await bitbucketAPI.getNextPage(currentResults))
                 .data;
 
-            allResults = allResults.concat(currentResults.values);
+            if (currentResults.values && Array.isArray(currentResults.values)) {
+                allResults = allResults.concat(currentResults.values);
+            }
         }
 
         // Return only up to the limit
@@ -4134,6 +4202,7 @@ export class BitbucketService
                 .listForRepo({
                     repo_slug: `{${this.sanitizeUUID(targetRepo.id)}}`,
                     workspace: `{${this.sanitizeUUID(targetRepo.workspaceId)}}`,
+                    pagelen: 100,
                 })
                 .then((res) => this.getPaginatedResults(bitbucketAPI, res));
 
@@ -4191,6 +4260,7 @@ export class BitbucketService
                         .listForRepo({
                             repo_slug: `{${repo.id}}`,
                             workspace: `{${repo.workspaceId}}`,
+                            pagelen: 100,
                         })
                         .then((res) =>
                             this.getPaginatedResults(bitbucketAPI, res),
@@ -4480,7 +4550,7 @@ export class BitbucketService
             // Se max_depth falhar (timeout 555), tentar com profundidade menor
             if (
                 error instanceof Error &&
-                error.message.includes('555') &&
+                error.message?.includes('555') &&
                 maxDepth > 3
             ) {
                 this.logger.warn({
@@ -5000,7 +5070,7 @@ export class BitbucketService
             },
             message: pullRequest?.title ?? '',
             created_at: pullRequest?.created_on ?? '',
-            closed_at: this._prClosedStates.includes(pullRequest?.state)
+            closed_at: this._prClosedStates?.includes(pullRequest?.state)
                 ? (pullRequest?.updated_on ?? '')
                 : '',
             updated_at: pullRequest?.updated_on ?? '',
