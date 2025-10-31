@@ -8,6 +8,7 @@ import { ConversationAgentUseCase } from '../../agent/conversation-agent.use-cas
 import { BusinessRulesValidationAgentUseCase } from '../../agent/business-rules-validation-agent.use-case';
 import { createThreadId } from '@kodus/flow';
 import posthogClient from '@/shared/utils/posthog';
+import { PlatformResponsePolicyFactory } from './policies/platform-response.policy';
 
 // Constants
 const KODY_COMMANDS = {
@@ -400,45 +401,61 @@ export class ChatWithKodyFromGitUseCase {
             },
         );
 
-        const ackResponse = await this.codeManagementService.createIssueComment(
-            {
+        const responsePolicy = PlatformResponsePolicyFactory.create(
+            params.platformType,
+        );
+
+        let ackResponse = null;
+        let ackResponseId = null;
+        let parentId = null;
+        const commentId = this.getCommentId(params);
+
+        if (responsePolicy.usesReaction()) {
+            await this.codeManagementService.addReactionToComment({
                 organizationAndTeamData,
                 repository,
                 prNumber: pullRequestNumber,
-                body: this.getAcknowledgmentBody(params.platformType),
-            },
-        );
-
-        if (!ackResponse) {
-            this.logger.warn({
-                message: 'Failed to create acknowledgment response',
-                context: ChatWithKodyFromGitUseCase.name,
-                metadata: {
-                    repository: repository.name,
-                    pullRequestNumber,
-                },
+                commentId,
+                reaction: responsePolicy.getAcknowledgmentReaction(),
             });
-            return;
-        }
+        } else if (responsePolicy.requiresAcknowledgment()) {
+            ackResponse = await this.codeManagementService.createIssueComment({
+                organizationAndTeamData,
+                repository,
+                prNumber: pullRequestNumber,
+                body: responsePolicy.getAcknowledgmentBody(),
+            });
 
-        const [ackResponseId, parentId] =
-            this.getBusinessLogicAcknowledgmentIds(
+            if (!ackResponse) {
+                this.logger.warn({
+                    message: 'Failed to create acknowledgment response',
+                    context: ChatWithKodyFromGitUseCase.name,
+                    metadata: {
+                        repository: repository.name,
+                        pullRequestNumber,
+                    },
+                });
+                return;
+            }
+
+            [ackResponseId, parentId] = this.getBusinessLogicAcknowledgmentIds(
                 ackResponse,
                 params.platformType,
             );
 
-        if (!ackResponseId) {
-            this.logger.warn({
-                message:
-                    'Failed to get acknowledgment response ID for business logic',
-                context: ChatWithKodyFromGitUseCase.name,
-                metadata: {
-                    repository: repository.name,
-                    pullRequestNumber,
-                    platformType: params.platformType,
-                },
-            });
-            return;
+            if (!ackResponseId) {
+                this.logger.warn({
+                    message:
+                        'Failed to get acknowledgment response ID for business logic',
+                    context: ChatWithKodyFromGitUseCase.name,
+                    metadata: {
+                        repository: repository.name,
+                        pullRequestNumber,
+                        platformType: params.platformType,
+                    },
+                });
+                return;
+            }
         }
 
         const prepareContext = {
@@ -471,25 +488,91 @@ export class ChatWithKodyFromGitUseCase {
         }
 
         try {
-            const updateParams: any = {
-                organizationAndTeamData,
-                repository,
-                prNumber: pullRequestNumber,
-                commentId: Number(ackResponseId),
-                body: response,
-            };
+            if (responsePolicy.usesReaction()) {
+                await this.codeManagementService.createIssueComment({
+                    organizationAndTeamData,
+                    repository,
+                    prNumber: pullRequestNumber,
+                    body: response,
+                });
 
-            if (params.platformType === PlatformType.GITLAB) {
-                updateParams.noteId = parentId ? Number(parentId) : undefined;
-            } else if (params.platformType === PlatformType.AZURE_REPOS) {
-                updateParams.threadId = parentId ? Number(parentId) : undefined;
+                this.logger.log({
+                    message:
+                        'Attempting to remove reaction from comment (business logic)',
+                    context: ChatWithKodyFromGitUseCase.name,
+                    metadata: {
+                        commentId,
+                        reaction: responsePolicy.getAcknowledgmentReaction(),
+                    },
+                });
+
+                try {
+                    await this.codeManagementService.removeReactionsFromComment(
+                        {
+                            organizationAndTeamData,
+                            repository,
+                            prNumber: pullRequestNumber,
+                            commentId,
+                            reactions: [
+                                responsePolicy.getAcknowledgmentReaction(),
+                            ],
+                        },
+                    );
+
+                    this.logger.log({
+                        message:
+                            'Successfully removed reaction from comment (business logic)',
+                        context: ChatWithKodyFromGitUseCase.name,
+                        metadata: { commentId },
+                    });
+                } catch (removeError) {
+                    this.logger.error({
+                        message:
+                            'Failed to remove reaction from comment (business logic)',
+                        context: ChatWithKodyFromGitUseCase.name,
+                        error: removeError,
+                        metadata: {
+                            commentId,
+                            reaction:
+                                responsePolicy.getAcknowledgmentReaction(),
+                        },
+                    });
+                }
+            } else if (responsePolicy.requiresAcknowledgment()) {
+                const updateParams: {
+                    organizationAndTeamData: OrganizationAndTeamData;
+                    repository: { name: string; id: string };
+                    prNumber: number;
+                    commentId: number;
+                    body: string;
+                    noteId?: number;
+                    threadId?: number;
+                } = {
+                    organizationAndTeamData,
+                    repository,
+                    prNumber: pullRequestNumber,
+                    commentId: Number(ackResponseId),
+                    body: response,
+                };
+
+                if (params.platformType === PlatformType.GITLAB) {
+                    updateParams.noteId = parentId
+                        ? Number(parentId)
+                        : undefined;
+                } else if (params.platformType === PlatformType.AZURE_REPOS) {
+                    updateParams.threadId = parentId
+                        ? Number(parentId)
+                        : undefined;
+                }
+
+                await this.codeManagementService.updateIssueComment(
+                    updateParams,
+                );
             }
-
-            await this.codeManagementService.updateIssueComment(updateParams);
 
             this.logger.log({
                 message:
-                    'Successfully updated PR response for business logic validation',
+                    'Successfully created/updated PR response for business logic validation',
                 context: ChatWithKodyFromGitUseCase.name,
                 metadata: {
                     repository: repository.name,
@@ -499,7 +582,7 @@ export class ChatWithKodyFromGitUseCase {
         } catch (error) {
             this.logger.error({
                 message:
-                    'Failed to update PR response for business logic validation',
+                    'Failed to create/update PR response for business logic validation',
                 context: ChatWithKodyFromGitUseCase.name,
                 error,
                 metadata: {
@@ -580,49 +663,68 @@ export class ChatWithKodyFromGitUseCase {
         );
         const sender = this.getSender(params);
 
-        const ackResponse =
-            await this.codeManagementService.createResponseToComment({
-                organizationAndTeamData,
-                inReplyToId: comment.id,
-                discussionId: params.payload?.object_attributes?.discussion_id,
-                threadId: comment.threadId,
-                body: this.getAcknowledgmentBody(params.platformType),
-                repository,
-                prNumber: pullRequestNumber,
-            });
-
-        if (!ackResponse) {
-            this.logger.warn({
-                message: 'Failed to create acknowledgment response',
-                context: ChatWithKodyFromGitUseCase.name,
-                metadata: {
-                    repository: repository.name,
-                    pullRequestNumber,
-                    commentId: comment.id,
-                },
-            });
-            return;
-        }
-
-        const [ackResponseId, parentId] = this.getAcknowledgmentIds(
-            originalKodyComment,
-            ackResponse,
+        const responsePolicy = PlatformResponsePolicyFactory.create(
             params.platformType,
-            comment,
         );
 
-        if (!ackResponseId || !parentId) {
-            this.logger.warn({
-                message:
-                    'Failed to get acknowledgment response ID or parent ID',
-                context: ChatWithKodyFromGitUseCase.name,
-                metadata: {
-                    repository: repository.name,
-                    pullRequestNumber,
-                    commentId: comment.id,
-                },
+        let ackResponse = null;
+        let ackResponseId = null;
+        let parentId = null;
+
+        if (responsePolicy.usesReaction()) {
+            await this.codeManagementService.addReactionToComment({
+                organizationAndTeamData,
+                repository,
+                prNumber: pullRequestNumber,
+                commentId: comment.id,
+                reaction: responsePolicy.getAcknowledgmentReaction(),
             });
-            return;
+        } else if (responsePolicy.requiresAcknowledgment()) {
+            ackResponse =
+                await this.codeManagementService.createResponseToComment({
+                    organizationAndTeamData,
+                    inReplyToId: comment.id,
+                    discussionId:
+                        params.payload?.object_attributes?.discussion_id,
+                    threadId: comment.threadId,
+                    body: responsePolicy.getAcknowledgmentBody(),
+                    repository,
+                    prNumber: pullRequestNumber,
+                });
+
+            if (!ackResponse) {
+                this.logger.warn({
+                    message: 'Failed to create acknowledgment response',
+                    context: ChatWithKodyFromGitUseCase.name,
+                    metadata: {
+                        repository: repository.name,
+                        pullRequestNumber,
+                        commentId: comment.id,
+                    },
+                });
+                return;
+            }
+
+            [ackResponseId, parentId] = this.getAcknowledgmentIds(
+                originalKodyComment,
+                ackResponse,
+                params.platformType,
+                comment,
+            );
+
+            if (!ackResponseId || !parentId) {
+                this.logger.warn({
+                    message:
+                        'Failed to get acknowledgment response ID or parent ID',
+                    context: ChatWithKodyFromGitUseCase.name,
+                    metadata: {
+                        repository: repository.name,
+                        pullRequestNumber,
+                        commentId: comment.id,
+                    },
+                });
+                return;
+            }
         }
 
         let response = '';
@@ -685,39 +787,99 @@ export class ChatWithKodyFromGitUseCase {
             return;
         }
 
-        const updatedComment =
-            await this.codeManagementService.updateResponseToComment({
-                organizationAndTeamData,
-                parentId,
-                commentId: ackResponseId,
-                body: response,
-                prNumber: pullRequestNumber,
-                repository,
-            });
+        try {
+            if (responsePolicy.usesReaction()) {
+                await this.codeManagementService.createResponseToComment({
+                    organizationAndTeamData,
+                    inReplyToId: comment.id,
+                    discussionId:
+                        params.payload?.object_attributes?.discussion_id,
+                    threadId: comment.threadId,
+                    body: response,
+                    repository,
+                    prNumber: pullRequestNumber,
+                });
 
-        if (!updatedComment) {
-            this.logger.warn({
-                message: 'Failed to update acknowledgment response',
+                this.logger.log({
+                    message: 'Attempting to remove reaction from comment',
+                    context: ChatWithKodyFromGitUseCase.name,
+                    metadata: {
+                        commentId: comment.id,
+                        reaction: responsePolicy.getAcknowledgmentReaction(),
+                        organizationAndTeamData,
+                    },
+                });
+
+                try {
+                    await this.codeManagementService.removeReactionsFromComment(
+                        {
+                            organizationAndTeamData,
+                            repository,
+                            prNumber: pullRequestNumber,
+                            commentId: comment.id,
+                            reactions: [
+                                responsePolicy.getAcknowledgmentReaction(),
+                            ],
+                        },
+                    );
+
+                    this.logger.log({
+                        message: 'Successfully removed reaction from comment',
+                        context: ChatWithKodyFromGitUseCase.name,
+                        metadata: {
+                            commentId: comment.id,
+                            organizationAndTeamData,
+                        },
+                    });
+                } catch (removeError) {
+                    this.logger.error({
+                        message: 'Failed to remove reaction from comment',
+                        context: ChatWithKodyFromGitUseCase.name,
+                        error: removeError,
+                        metadata: {
+                            commentId: comment.id,
+                            organizationAndTeamData,
+                            reaction:
+                                responsePolicy.getAcknowledgmentReaction(),
+                        },
+                    });
+                }
+            } else if (responsePolicy.requiresAcknowledgment()) {
+                await this.codeManagementService.updateResponseToComment({
+                    organizationAndTeamData,
+                    parentId,
+                    commentId: ackResponseId,
+                    body: response,
+                    prNumber: pullRequestNumber,
+                    repository,
+                });
+            }
+
+            this.logger.log({
+                message: 'Successfully executed conversation flow',
                 context: ChatWithKodyFromGitUseCase.name,
                 metadata: {
                     repository: repository.name,
                     pullRequestNumber,
                     commentId: comment.id,
+                    responseId: ackResponseId,
+                    organizationAndTeamData,
                 },
             });
-            return;
+        } catch (error) {
+            this.logger.error({
+                message:
+                    'Failed to create/update response in conversation flow',
+                context: ChatWithKodyFromGitUseCase.name,
+                error,
+                metadata: {
+                    repository: repository.name,
+                    pullRequestNumber,
+                    commentId: comment.id,
+                    organizationAndTeamData,
+                },
+            });
         }
-
-        this.logger.log({
-            message: 'Successfully executed conversation flow',
-            context: ChatWithKodyFromGitUseCase.name,
-            metadata: {
-                repository: repository.name,
-                pullRequestNumber,
-                commentId: comment.id,
-                responseId: ackResponseId,
-            },
-        });
     }
 
     private async handleBusinessLogicInvalidContextFlow(
@@ -755,6 +917,7 @@ export class ChatWithKodyFromGitUseCase {
                     repository: repository.name,
                     pullRequestNumber,
                     commentId,
+                    organizationAndTeamData,
                 },
             });
             return;
@@ -780,6 +943,7 @@ export class ChatWithKodyFromGitUseCase {
                     repository: repository.name,
                     pullRequestNumber,
                     commentId: comment.id,
+                    organizationAndTeamData,
                 },
             });
             return;
@@ -1421,14 +1585,6 @@ export class ChatWithKodyFromGitUseCase {
                 login?.includes(keyword),
             ) || body.includes(bodyWithoutMarkdown)
         );
-    }
-
-    private getAcknowledgmentBody(platformType: PlatformType): string {
-        let msg: string = ACKNOWLEDGMENT_MESSAGES.DEFAULT;
-        if (platformType !== PlatformType.BITBUCKET) {
-            msg = `${msg}${ACKNOWLEDGMENT_MESSAGES.MARKDOWN_SUFFIX}`;
-        }
-        return msg.trim();
     }
 
     private getAcknowledgmentIds(
