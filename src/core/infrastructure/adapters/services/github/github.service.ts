@@ -3503,17 +3503,35 @@ export class GithubService
                 params.organizationAndTeamData,
             );
 
-            await octokit.rest.reactions.createForIssueComment({
-                owner: githubAuthDetail.org,
-                repo: params.repository.name,
-                comment_id: params.commentId,
-                content: params.reaction as GitHubReaction,
-            });
+            try {
+                await octokit.rest.reactions.createForIssueComment({
+                    owner: githubAuthDetail.org,
+                    repo: params.repository.name,
+                    comment_id: params.commentId,
+                    content: params.reaction as GitHubReaction,
+                });
 
-            this.logger.log({
-                message: `Added reaction ${params.reaction} to comment ${params.commentId}`,
-                context: GithubService.name,
-            });
+                this.logger.log({
+                    message: `Added reaction ${params.reaction} to issue comment ${params.commentId}`,
+                    context: GithubService.name,
+                });
+            } catch (issueCommentError) {
+                if (issueCommentError.status === 404) {
+                    await octokit.rest.reactions.createForPullRequestReviewComment({
+                        owner: githubAuthDetail.org,
+                        repo: params.repository.name,
+                        comment_id: params.commentId,
+                        content: params.reaction as GitHubReaction,
+                    });
+
+                    this.logger.log({
+                        message: `Added reaction ${params.reaction} to review comment ${params.commentId}`,
+                        context: GithubService.name,
+                    });
+                } else {
+                    throw issueCommentError;
+                }
+            }
         } catch (error) {
             this.logger.error({
                 message: `Error adding reaction to comment ${params.commentId}`,
@@ -3521,6 +3539,7 @@ export class GithubService
                 error: error,
                 metadata: params,
             });
+            throw error;
         }
     }
 
@@ -3609,30 +3628,63 @@ export class GithubService
                 params.organizationAndTeamData,
             );
 
-            const existingReactions =
-                await octokit.rest.reactions.listForIssueComment({
-                    owner: githubAuthDetail.org,
-                    repo: params.repository.name,
-                    comment_id: params.commentId,
-                });
+            let existingReactions;
+            let isReviewComment = false;
+
+            try {
+                existingReactions =
+                    await octokit.rest.reactions.listForIssueComment({
+                        owner: githubAuthDetail.org,
+                        repo: params.repository.name,
+                        comment_id: params.commentId,
+                    });
+            } catch (listError) {
+                if (listError.status === 404) {
+                    existingReactions =
+                        await octokit.rest.reactions.listForPullRequestReviewComment({
+                            owner: githubAuthDetail.org,
+                            repo: params.repository.name,
+                            comment_id: params.commentId,
+                        });
+                    isReviewComment = true;
+                } else {
+                    throw listError;
+                }
+            }
 
             const reactionsToRemove = existingReactions.data.filter((r: any) =>
                 params.reactions.includes(r.content as GitHubReaction),
             );
 
-            await Promise.all(
-                reactionsToRemove.map((reaction) =>
-                    octokit.rest.reactions.deleteForIssueComment({
-                        owner: githubAuthDetail.org,
-                        repo: params.repository.name,
-                        comment_id: params.commentId,
-                        reaction_id: reaction.id,
-                    }),
-                ),
-            );
+            if (isReviewComment) {
+                await Promise.all(
+                    reactionsToRemove.map((reaction) =>
+                        octokit.request(
+                            'DELETE /repos/{owner}/{repo}/pulls/comments/{comment_id}/reactions/{reaction_id}',
+                            {
+                                owner: githubAuthDetail.org,
+                                repo: params.repository.name,
+                                comment_id: params.commentId,
+                                reaction_id: reaction.id,
+                            },
+                        ),
+                    ),
+                );
+            } else {
+                await Promise.all(
+                    reactionsToRemove.map((reaction) =>
+                        octokit.rest.reactions.deleteForIssueComment({
+                            owner: githubAuthDetail.org,
+                            repo: params.repository.name,
+                            comment_id: params.commentId,
+                            reaction_id: reaction.id,
+                        }),
+                    ),
+                );
+            }
 
             this.logger.log({
-                message: `Removed reactions from comment ${params.commentId}`,
+                message: `Removed reactions from ${isReviewComment ? 'review' : 'issue'} comment ${params.commentId}`,
                 context: GithubService.name,
                 metadata: { reactionsRemoved: reactionsToRemove.length },
             });
@@ -3643,6 +3695,7 @@ export class GithubService
                 error: error,
                 metadata: params,
             });
+            throw error;
         }
     }
 
