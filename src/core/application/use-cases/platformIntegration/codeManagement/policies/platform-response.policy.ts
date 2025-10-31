@@ -6,14 +6,14 @@ const ACKNOWLEDGMENT_MESSAGES = {
     MARKDOWN_SUFFIX: '<!-- kody-codereview -->\n&#8203;',
 } as const;
 
-interface PlatformResponsePolicy {
+interface IPlatformResponsePolicy {
     requiresAcknowledgment(): boolean;
     usesReaction(): boolean;
-    getAcknowledgmentReaction?(): GitHubReaction;
-    getAcknowledgmentBody?(): string;
+    getAcknowledgmentReaction(): GitHubReaction;
+    getAcknowledgmentBody(): string;
 }
 
-class GitHubResponsePolicy implements PlatformResponsePolicy {
+class GitHubResponsePolicy implements IPlatformResponsePolicy {
     requiresAcknowledgment(): boolean {
         return false;
     }
@@ -25,9 +25,15 @@ class GitHubResponsePolicy implements PlatformResponsePolicy {
     getAcknowledgmentReaction(): GitHubReaction {
         return GitHubReaction.ROCKET;
     }
+
+    getAcknowledgmentBody(): string {
+        throw new Error(
+            'GitHubResponsePolicy does not use acknowledgment body. Use reactions instead.',
+        );
+    }
 }
 
-class GitLabResponsePolicy implements PlatformResponsePolicy {
+class GitLabResponsePolicy implements IPlatformResponsePolicy {
     requiresAcknowledgment(): boolean {
         return true;
     }
@@ -39,9 +45,15 @@ class GitLabResponsePolicy implements PlatformResponsePolicy {
     getAcknowledgmentBody(): string {
         return `${ACKNOWLEDGMENT_MESSAGES.DEFAULT}${ACKNOWLEDGMENT_MESSAGES.MARKDOWN_SUFFIX}`.trim();
     }
+
+    getAcknowledgmentReaction(): GitHubReaction {
+        throw new Error(
+            'GitLabResponsePolicy does not use reactions. Use acknowledgment body instead.',
+        );
+    }
 }
 
-class BitbucketResponsePolicy implements PlatformResponsePolicy {
+class BitbucketResponsePolicy implements IPlatformResponsePolicy {
     requiresAcknowledgment(): boolean {
         return true;
     }
@@ -53,9 +65,15 @@ class BitbucketResponsePolicy implements PlatformResponsePolicy {
     getAcknowledgmentBody(): string {
         return ACKNOWLEDGMENT_MESSAGES.DEFAULT.trim();
     }
+
+    getAcknowledgmentReaction(): GitHubReaction {
+        throw new Error(
+            'BitbucketResponsePolicy does not use reactions. Use acknowledgment body instead.',
+        );
+    }
 }
 
-class AzureReposResponsePolicy implements PlatformResponsePolicy {
+class AzureReposResponsePolicy implements IPlatformResponsePolicy {
     requiresAcknowledgment(): boolean {
         return true;
     }
@@ -67,10 +85,16 @@ class AzureReposResponsePolicy implements PlatformResponsePolicy {
     getAcknowledgmentBody(): string {
         return `${ACKNOWLEDGMENT_MESSAGES.DEFAULT}${ACKNOWLEDGMENT_MESSAGES.MARKDOWN_SUFFIX}`.trim();
     }
+
+    getAcknowledgmentReaction(): GitHubReaction {
+        throw new Error(
+            'AzureReposResponsePolicy does not use reactions. Use acknowledgment body instead.',
+        );
+    }
 }
 
 export class PlatformResponsePolicyFactory {
-    static create(platformType: PlatformType): PlatformResponsePolicy {
+    static create(platformType: PlatformType): IPlatformResponsePolicy {
         switch (platformType) {
             case PlatformType.GITHUB:
                 return new GitHubResponsePolicy();
@@ -85,4 +109,3 @@ export class PlatformResponsePolicyFactory {
         }
     }
 }
-

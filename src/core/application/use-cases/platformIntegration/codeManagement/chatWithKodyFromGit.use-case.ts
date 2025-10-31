@@ -419,13 +419,12 @@ export class ChatWithKodyFromGitUseCase {
                 reaction: responsePolicy.getAcknowledgmentReaction(),
             });
         } else if (responsePolicy.requiresAcknowledgment()) {
-            ackResponse =
-                await this.codeManagementService.createIssueComment({
-                    organizationAndTeamData,
-                    repository,
-                    prNumber: pullRequestNumber,
-                    body: responsePolicy.getAcknowledgmentBody(),
-                });
+            ackResponse = await this.codeManagementService.createIssueComment({
+                organizationAndTeamData,
+                repository,
+                prNumber: pullRequestNumber,
+                body: responsePolicy.getAcknowledgmentBody(),
+            });
 
             if (!ackResponse) {
                 this.logger.warn({
@@ -534,7 +533,8 @@ export class ChatWithKodyFromGitUseCase {
                         error: removeError,
                         metadata: {
                             commentId,
-                            reaction: responsePolicy.getAcknowledgmentReaction(),
+                            reaction:
+                                responsePolicy.getAcknowledgmentReaction(),
                         },
                     });
                 }
@@ -556,7 +556,9 @@ export class ChatWithKodyFromGitUseCase {
                 };
 
                 if (params.platformType === PlatformType.GITLAB) {
-                    updateParams.noteId = parentId ? Number(parentId) : undefined;
+                    updateParams.noteId = parentId
+                        ? Number(parentId)
+                        : undefined;
                 } else if (params.platformType === PlatformType.AZURE_REPOS) {
                     updateParams.threadId = parentId
                         ? Number(parentId)
@@ -804,6 +806,7 @@ export class ChatWithKodyFromGitUseCase {
                     metadata: {
                         commentId: comment.id,
                         reaction: responsePolicy.getAcknowledgmentReaction(),
+                        organizationAndTeamData,
                     },
                 });
 
@@ -823,7 +826,10 @@ export class ChatWithKodyFromGitUseCase {
                     this.logger.log({
                         message: 'Successfully removed reaction from comment',
                         context: ChatWithKodyFromGitUseCase.name,
-                        metadata: { commentId: comment.id },
+                        metadata: {
+                            commentId: comment.id,
+                            organizationAndTeamData,
+                        },
                     });
                 } catch (removeError) {
                     this.logger.error({
@@ -832,7 +838,9 @@ export class ChatWithKodyFromGitUseCase {
                         error: removeError,
                         metadata: {
                             commentId: comment.id,
-                            reaction: responsePolicy.getAcknowledgmentReaction(),
+                            organizationAndTeamData,
+                            reaction:
+                                responsePolicy.getAcknowledgmentReaction(),
                         },
                     });
                 }
@@ -855,6 +863,7 @@ export class ChatWithKodyFromGitUseCase {
                     pullRequestNumber,
                     commentId: comment.id,
                     responseId: ackResponseId,
+                    organizationAndTeamData,
                 },
             });
         } catch (error) {
@@ -867,6 +876,7 @@ export class ChatWithKodyFromGitUseCase {
                     repository: repository.name,
                     pullRequestNumber,
                     commentId: comment.id,
+                    organizationAndTeamData,
                 },
             });
         }
@@ -907,6 +917,7 @@ export class ChatWithKodyFromGitUseCase {
                     repository: repository.name,
                     pullRequestNumber,
                     commentId,
+                    organizationAndTeamData,
                 },
             });
             return;
@@ -932,6 +943,7 @@ export class ChatWithKodyFromGitUseCase {
                     repository: repository.name,
                     pullRequestNumber,
                     commentId: comment.id,
+                    organizationAndTeamData,
                 },
             });
             return;
