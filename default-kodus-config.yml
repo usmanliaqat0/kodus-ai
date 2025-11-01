@@ -76,6 +76,8 @@ customMessages:
 
             ✋ Hi, team! I'm already looking at the changed files and starting the review to ensure everything is in order. If you need more details, I'm here! [Kody](https://kodus.io)
 
+            @reviewCadence
+
             @changedFiles
 
             @changeSummary
