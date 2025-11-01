@@ -1,6 +1,6 @@
 // services/message-template-processor.service.ts
 import { Injectable } from '@nestjs/common';
-import { FileChange } from '@/config/types/general/codeReview.type';
+import { FileChange, ReviewCadenceType } from '@/config/types/general/codeReview.type';
 import { OrganizationAndTeamData } from '@/config/types/general/organizationAndTeamData';
 import { CodeReviewConfig } from '@/config/types/general/codeReview.type';
 import { PlatformType } from '@/shared/domain/enums/platform-type.enum';
@@ -35,6 +35,7 @@ export class MessageTemplateProcessor {
         this.handlers.set('changedFiles', this.generateChangedFilesTable);
         this.handlers.set('changeSummary', this.generateChangeSummary);
         this.handlers.set('reviewOptions', this.generateReviewOptionsAccordion);
+        this.handlers.set('reviewCadence', this.generateReviewCadenceInfo);
     }
 
     /**
@@ -44,6 +45,7 @@ export class MessageTemplateProcessor {
      * @changedFiles - requires: context.changedFiles, context.language
      * @changeSummary - requires: context.changedFiles, context.language
      * @reviewOptions - requires: context.codeReviewConfig, context.language
+     * @reviewCadence - requires: context.codeReviewConfig, context.language
      *
      * @param template Template with @placeholders
      * @param context Context for the handlers
@@ -195,6 +197,69 @@ ${translation.reviewOptionsDesc}
 ${reviewOptionsMarkdown}
 
 </details>`.trim();
+    };
+
+    /**
+     * Generate the review cadence information
+     * @requires context.codeReviewConfig - Review configuration
+     * @requires context.language - Language for translation
+     * @param context PlaceholderContext
+     * @returns Markdown with the review cadence information
+     */
+    private generateReviewCadenceInfo = (
+        context: PlaceholderContext,
+    ): string => {
+        if (!context.codeReviewConfig?.reviewCadence) return '';
+
+        const language =
+            context.codeReviewConfig?.languageResultPrompt ??
+            LanguageValue.ENGLISH;
+        const translation = getTranslationsForLanguageByCategory(
+            language as LanguageValue,
+            TranslationsCategory.ReviewCadenceInfo,
+        );
+
+        if (!translation) return '';
+
+        const cadenceType = context.codeReviewConfig.reviewCadence.type;
+        let statusEmoji = '';
+        let statusText = '';
+        let description = '';
+
+        switch (cadenceType) {
+            case ReviewCadenceType.AUTOMATIC:
+                statusEmoji = '🤖';
+                statusText = translation.automaticTitle || 'Automatic Review';
+                description =
+                    translation.automaticDesc ||
+                    'Kody will automatically review every push to this PR.';
+                break;
+
+            case ReviewCadenceType.AUTO_PAUSE:
+                statusEmoji = '⏸️';
+                statusText = translation.autoPauseTitle || 'Auto-Pause Mode';
+                const timeWindow =
+                    context.codeReviewConfig.reviewCadence.timeWindow || 15;
+                const pushes =
+                    context.codeReviewConfig.reviewCadence.pushesToTrigger || 3;
+                description =
+                    translation.autoPauseDesc?.replace('{timeWindow}', String(timeWindow))?.replace('{pushes}', String(pushes)) ||
+                    `Kody reviews the first push automatically, then pauses if you make ${pushes}+ pushes in ${timeWindow} minutes. Use @kody resume to continue.`;
+                break;
+
+            case ReviewCadenceType.MANUAL:
+                statusEmoji = '✋';
+                statusText = translation.manualTitle || 'Manual Review';
+                description =
+                    translation.manualDesc ||
+                    'Kody only reviews when you request with @kody start-review command.';
+                break;
+
+            default:
+                return '';
+        }
+
+        return `**${statusEmoji} ${statusText}**: ${description}`;
     };
 
     private getTranslation(language?: string) {

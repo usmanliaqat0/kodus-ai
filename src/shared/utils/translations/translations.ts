@@ -140,12 +140,23 @@ interface DiscordFormatter {
     doraMetrics: DoraMetrics;
     percentiles: Percentiles;
 }
+
+interface ReviewCadenceInfo {
+    automaticTitle: string;
+    automaticDesc: string;
+    autoPauseTitle: string;
+    autoPauseDesc: string;
+    manualTitle: string;
+    manualDesc: string;
+}
+
 interface Translations {
     reviewComment: ReviewComment;
     pullRequestFinishSummaryMarkdown: PullRequestFinishSummaryMarkdown;
     pullRequestSummaryMarkdown: PullRequestSummaryMarkdown;
     configReviewMarkdown: ConfigReviewMarkdown;
     discordFormatter: DiscordFormatter;
+    reviewCadenceInfo: ReviewCadenceInfo;
 }
 
 enum TranslationsCategory {
@@ -154,6 +165,7 @@ enum TranslationsCategory {
     PullRequestSummaryMarkdown = 'pullRequestSummaryMarkdown',
     ConfigReviewMarkdown = 'configReviewMarkdown',
     DiscordFormatter = 'discordFormatter',
+    ReviewCadenceInfo = 'reviewCadenceInfo',
 }
 
 export {
