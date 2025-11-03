@@ -96,10 +96,10 @@
     },
     "reviewCadenceInfo": {
         "automaticTitle": "Automatic Review",
-        "automaticDesc": "Kody will automatically review every push to this PR.",
+        "automaticDesc": "Kody reviews this PR automatically on every push.",
         "autoPauseTitle": "Auto-Pause Mode",
-        "autoPauseDesc": "Kody reviews the first push automatically, then pauses if you make {pushes}+ pushes in {timeWindow} minutes. Use @kody resume to continue.",
+        "autoPauseDesc": "Kody reviews automatically but pauses after rapid changes ({pushes}+ pushes in {timeWindow} minutes). Use @kody resume to continue.",
         "manualTitle": "Manual Review",
-        "manualDesc": "Kody only reviews when you request with @kody start-review command."
+        "manualDesc": "Kody reviews the first push automatically, then only when you request with @kody start-review."
     }
 }
