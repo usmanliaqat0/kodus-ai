@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddCriticalIndexes1729876543210 implements MigrationInterface {
-    name = 'AddCriticalIndexes1729876543210';
+export class AddCriticalIndexes1761081305000 implements MigrationInterface {
+    name = 'AddCriticalIndexes1761081305000';
 
     // CRITICAL: Disable transactions for CONCURRENT index creation
     // Without this, CREATE INDEX CONCURRENTLY will fail
