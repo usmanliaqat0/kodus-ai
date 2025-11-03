@@ -29,6 +29,16 @@ export interface ICommentManagerService {
         pullRequestMessages?: IPullRequestMessages,
     ): Promise<{ commentId: number; noteId: number; threadId?: number }>;
 
+    processEndReviewMessageTemplate(
+        template: string,
+        changedFiles: FileChange[],
+        organizationAndTeamData: OrganizationAndTeamData,
+        prNumber: number,
+        codeReviewConfig?: CodeReviewConfig,
+        language?: string,
+        platformType?: PlatformType,
+    ): Promise<string>;
+
     generateSummaryPR(
         pullRequest: any,
         repository: { name: string; id: string },

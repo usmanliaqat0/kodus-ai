@@ -10,7 +10,7 @@
     "pullRequestSummaryMarkdown": {
         "title": "Resumo da PR (Comentário criado por [Kody](https://kodus.io) 🤖)",
         "codeReviewStarted": "Revisão de Código Iniciada! 🚀",
-        "description": "✋ Olá, equipe! Já estou analisando os arquivos alterados e iniciando a revisão para garantir que tudo esteja em ordem. Se precisarem de mais detalhes, estou aqui! [Kody](https://kodus.io)",
+        "description": "✋ Olá, time! Já estou analisando os arquivos alterados e iniciando a revisão para garantir que tudo esteja em ordem. Se precisarem de mais detalhes, estou aqui! [Kody](https://kodus.io)",
         "changedFiles": "📂 Arquivos Alterados",
         "filesTable": [
             "Arquivo",

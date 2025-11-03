@@ -561,6 +561,32 @@ export class CommentManagerService implements ICommentManagerService {
         }
     }
 
+    async processEndReviewMessageTemplate(
+        template: string,
+        changedFiles: FileChange[],
+        organizationAndTeamData: OrganizationAndTeamData,
+        prNumber: number,
+        codeReviewConfig?: CodeReviewConfig,
+        language?: string,
+        platformType?: PlatformType,
+    ): Promise<string> {
+        const placeholderContext = await this.getTemplateContext(
+            changedFiles,
+            organizationAndTeamData,
+            prNumber,
+            codeReviewConfig,
+            language,
+            platformType,
+        );
+
+        const processedBody = await this.messageProcessor.processTemplate(
+            template,
+            placeholderContext,
+        );
+
+        return this.sanitizeBitbucketMarkdown(processedBody, platformType);
+    }
+
     async updateOverallComment(
         organizationAndTeamData: OrganizationAndTeamData,
         prNumber: number,
