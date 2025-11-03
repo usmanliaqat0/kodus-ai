@@ -222,13 +222,11 @@ ${reviewOptionsMarkdown}
         if (!translation) return '';
 
         const cadenceType = context.codeReviewConfig.reviewCadence.type;
-        let statusEmoji = '';
         let statusText = '';
         let description = '';
 
         switch (cadenceType) {
             case ReviewCadenceType.AUTOMATIC:
-                statusEmoji = '🤖';
                 statusText = translation.automaticTitle || 'Automatic Review';
                 description =
                     translation.automaticDesc ||
@@ -236,7 +234,6 @@ ${reviewOptionsMarkdown}
                 break;
 
             case ReviewCadenceType.AUTO_PAUSE:
-                statusEmoji = '⏸️';
                 statusText = translation.autoPauseTitle || 'Auto-Pause Mode';
                 const timeWindow =
                     context.codeReviewConfig.reviewCadence.timeWindow || 15;
@@ -248,7 +245,6 @@ ${reviewOptionsMarkdown}
                 break;
 
             case ReviewCadenceType.MANUAL:
-                statusEmoji = '✋';
                 statusText = translation.manualTitle || 'Manual Review';
                 description =
                     translation.manualDesc ||
@@ -259,7 +255,7 @@ ${reviewOptionsMarkdown}
                 return '';
         }
 
-        return `**${statusEmoji} ${statusText}**: ${description}`;
+        return `**${statusText}**: ${description}`;
     };
 
     private getTranslation(language?: string) {

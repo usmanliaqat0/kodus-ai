@@ -142,7 +142,16 @@ export class UpdateCommentsAndGenerateSummaryStage extends BasePipelineStage<Cod
                 (startReviewMessage.status === PullRequestMessageStatus.ONLY_WHEN_OPENED &&
                     !context.lastExecution))
         ) {
-            const finalCommentBody = endReviewMessage.content;
+            const finalCommentBody =
+                await this.commentManagerService.processEndReviewMessageTemplate(
+                    endReviewMessage.content,
+                    context.changedFiles,
+                    organizationAndTeamData,
+                    pullRequest.number,
+                    codeReviewConfig,
+                    codeReviewConfig?.languageResultPrompt ?? 'en-US',
+                    platformType,
+                );
 
             await this.commentManagerService.updateOverallComment(
                 organizationAndTeamData,
