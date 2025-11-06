@@ -87,9 +87,11 @@ export class GetIssueByIdUseCase implements IUseCase {
                     configValue: [{ id: issue.repository.id }],
                 });
 
-            httpUrl = integrationConfig?.configValue
-                .filter((x) => x.id === issue.repository.id)
-                .map((y) => y.http_url)[0];
+            const repoConfig = integrationConfig?.configValue?.find(
+                (x) => x.id === issue.repository.id,
+            );
+            
+            httpUrl = repoConfig?.http_url ?? null;
         }
 
         const dataToBuildUrls = {
