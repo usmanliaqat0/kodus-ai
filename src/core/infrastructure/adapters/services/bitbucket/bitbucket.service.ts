@@ -4375,47 +4375,27 @@ export class BitbucketService
         try {
             const bitbucketAPI =
                 this.instanceBitbucketApi(bitbucketAuthDetails);
-            const allItems: any[] = [];
-            let hasNext = true;
-            let nextPageUrl: string | null = null;
-            let pageCount = 0;
 
-            while (hasNext) {
-                pageCount++;
+            // Fazer a primeira chamada
+            const initialResponse = directoryPath
+                ? await bitbucketAPI.source.read({
+                      workspace: `{${workspace}}`,
+                      repo_slug: `{${repositoryId}}`,
+                      path: directoryPath,
+                      pagelen: 50,
+                      commit: 'HEAD',
+                  })
+                : await bitbucketAPI.source.readRoot({
+                      workspace: `{${workspace}}`,
+                      repo_slug: `{${repositoryId}}`,
+                      pagelen: 50,
+                  });
 
-                let response: any;
-
-                try {
-                    if (directoryPath) {
-                        // Para um path específico - usar source.read
-                        response = await bitbucketAPI.source.read({
-                            workspace: `{${workspace}}`,
-                            repo_slug: `{${repositoryId}}`,
-                            path: directoryPath,
-                            pagelen: 50,
-                            commit: 'HEAD',
-                        });
-                    } else {
-                        // Para raiz - usar source.readRoot
-                        response = await bitbucketAPI.source.readRoot({
-                            workspace: `{${workspace}}`,
-                            repo_slug: `{${repositoryId}}`,
-                            pagelen: 50,
-                        });
-                    }
-                } catch (apiError) {
-                    throw apiError;
-                }
-
-                const items = response.data?.values || [];
-
-                allItems.push(...items);
-
-                nextPageUrl = response.data?.next || null;
-                hasNext = !!nextPageUrl;
-            }
-
-            return allItems;
+            // Usar o helper para paginação automática
+            return await this.getPaginatedResults(
+                bitbucketAPI,
+                initialResponse,
+            );
         } catch (error) {
             this.logger.error({
                 message: 'Error fetching directory items from Bitbucket',
@@ -4426,7 +4406,6 @@ export class BitbucketService
             return [];
         }
     }
-
     async getRepositoryTreeByDirectory(params: {
         organizationAndTeamData: OrganizationAndTeamData;
         repositoryId: string;
