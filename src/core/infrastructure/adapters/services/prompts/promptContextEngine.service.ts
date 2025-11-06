@@ -27,6 +27,10 @@ import {
     prompt_detect_external_references_system,
     prompt_detect_external_references_user,
 } from '@/shared/utils/langchainCommon/prompts/externalReferences';
+import {
+    prompt_kodyrules_detect_references_system,
+    prompt_kodyrules_detect_references_user,
+} from '@/shared/utils/langchainCommon/prompts/kodyRulesExternalReferences';
 import { IPromptContextEngineService } from '@/core/domain/prompts/contracts/promptContextEngine.contract';
 
 interface DetectReferencesParams {
@@ -38,6 +42,7 @@ interface DetectReferencesParams {
     repositoryName: string;
     organizationAndTeamData: OrganizationAndTeamData;
     context?: 'rule' | 'instruction' | 'prompt';
+    detectionMode?: 'rule' | 'prompt';
     byokConfig?: BYOKConfig;
 }
 
@@ -61,9 +66,7 @@ export class PromptContextEngineService implements IPromptContextEngineService {
         private readonly logger: PinoLoggerService,
     ) {}
 
-    async detectAndResolveReferences(
-        params: DetectReferencesParams,
-    ): Promise<{
+    async detectAndResolveReferences(params: DetectReferencesParams): Promise<{
         references: IFileReference[];
         syncErrors?: IPromptReferenceSyncError[];
         promptHash: string;
@@ -85,7 +88,9 @@ export class PromptContextEngineService implements IPromptContextEngineService {
         return createHash('sha256').update(promptText).digest('hex');
     }
 
-    private async runDetection(params: DetectReferencesParams): Promise<DetectionResult> {
+    private async runDetection(
+        params: DetectReferencesParams,
+    ): Promise<DetectionResult> {
         const promptHash = this.calculatePromptHash(params.promptText);
 
         if (!this.hasLikelyExternalReferences(params.promptText)) {
@@ -139,10 +144,7 @@ export class PromptContextEngineService implements IPromptContextEngineService {
             }
 
             const { references, notFoundDetails } =
-                await this.searchFilesInRepository(
-                    detectedReferences,
-                    params,
-                );
+                await this.searchFilesInRepository(detectedReferences, params);
 
             const markers = this.extractMarkers(params.promptText, references);
 
@@ -163,12 +165,11 @@ export class PromptContextEngineService implements IPromptContextEngineService {
             };
         } catch (error) {
             this.logger.error({
-                message:
-                    'Error detecting and resolving external references',
+                message: 'Error detecting and resolving external references',
                 context: PromptContextEngineService.name,
                 error,
                 metadata: {
-                        requirementId: params.requirementId,
+                    requirementId: params.requirementId,
                     repositoryId: params.repositoryId,
                     organizationId:
                         params.organizationAndTeamData.organizationId,
@@ -238,41 +239,50 @@ export class PromptContextEngineService implements IPromptContextEngineService {
 
         const { organizationAndTeamData } = params;
 
-        const { result: raw } =
-            await this.observabilityService.runLLMInSpan({
-                spanName: `${PromptContextEngineService.name}::${runName}`,
-                runName,
-                attrs: {
-                    organizationId: organizationAndTeamData.organizationId,
-                    type: promptRunner.executeMode,
-                    fallback: false,
-                    context: params.context || 'unknown',
-                },
-                exec: async (callbacks) => {
-                    return await promptRunner
-                        .builder()
-                        .setParser(ParserType.STRING)
-                        .setPayload({
-                            text: params.promptText,
-                            context: params.context,
-                        })
-                        .addPrompt({
-                            role: PromptRole.SYSTEM,
-                            prompt: prompt_detect_external_references_system(),
-                        })
-                        .addPrompt({
-                            role: PromptRole.USER,
-                            prompt: prompt_detect_external_references_user({
-                                text: params.promptText,
-                                context: params.context,
-                            }),
-                        })
-                        .addCallbacks(callbacks)
-                        .addMetadata({ runName })
-                        .setRunName(runName)
-                        .execute();
-                },
-            });
+        const { result: raw } = await this.observabilityService.runLLMInSpan({
+            spanName: `${PromptContextEngineService.name}::${runName}`,
+            runName,
+            attrs: {
+                organizationId: organizationAndTeamData.organizationId,
+                type: promptRunner.executeMode,
+                fallback: false,
+                context: params.context || 'unknown',
+            },
+            exec: async (callbacks) => {
+                const isRuleMode = params.detectionMode === 'rule';
+                const systemPrompt = isRuleMode
+                    ? prompt_kodyrules_detect_references_system()
+                    : prompt_detect_external_references_system();
+                const userPrompt = isRuleMode
+                    ? prompt_kodyrules_detect_references_user({
+                          rule: params.promptText,
+                      })
+                    : prompt_detect_external_references_user({
+                          text: params.promptText,
+                          context: params.context,
+                      });
+
+                return await promptRunner
+                    .builder()
+                    .setParser(ParserType.STRING)
+                    .setPayload({
+                        text: params.promptText,
+                        context: params.context,
+                    })
+                    .addPrompt({
+                        role: PromptRole.SYSTEM,
+                        prompt: systemPrompt,
+                    })
+                    .addPrompt({
+                        role: PromptRole.USER,
+                        prompt: userPrompt,
+                    })
+                    .addCallbacks(callbacks)
+                    .addMetadata({ runName })
+                    .setRunName(runName)
+                    .execute();
+            },
+        });
 
         if (!raw) {
             return [];
@@ -289,7 +299,7 @@ export class PromptContextEngineService implements IPromptContextEngineService {
             metadata: {
                 referencesCount: parsed.length,
                 organizationAndTeamData,
-                        requirementId: params.requirementId,
+                requirementId: params.requirementId,
             },
         });
 
@@ -355,7 +365,8 @@ export class PromptContextEngineService implements IPromptContextEngineService {
                     }`,
                     details: {
                         fileName: ref.fileName,
-                        repositoryName: ref.repositoryName || params.repositoryName,
+                        repositoryName:
+                            ref.repositoryName || params.repositoryName,
                         timestamp: new Date(),
                     },
                 });
@@ -369,8 +380,7 @@ export class PromptContextEngineService implements IPromptContextEngineService {
                         repositoryId: params.repositoryId,
                         repositoryName: ref.repositoryName,
                         crossRepo: !!ref.repositoryName,
-                        organizationAndTeamData:
-                            params.organizationAndTeamData,
+                        organizationAndTeamData: params.organizationAndTeamData,
                     },
                 });
             }
@@ -512,7 +522,8 @@ export class PromptContextEngineService implements IPromptContextEngineService {
                 }|${index}`,
                 metadata: {
                     repositoryId: params.repositoryId,
-                    repositoryName: reference.repositoryName ?? params.repositoryName,
+                    repositoryName:
+                        reference.repositoryName ?? params.repositoryName,
                     filePath: reference.filePath,
                     lineRange: reference.lineRange ?? null,
                     description: reference.description,
@@ -521,6 +532,13 @@ export class PromptContextEngineService implements IPromptContextEngineService {
                 },
             }),
         );
+
+        // Extract MCP dependencies from markers
+        const mcpDependencies = this.extractMCPDependencies(
+            params.promptText,
+            params.repositoryId,
+        );
+        dependencies.push(...mcpDependencies);
 
         return {
             id: params.requirementId,
@@ -555,6 +573,60 @@ export class PromptContextEngineService implements IPromptContextEngineService {
         };
     }
 
+    private extractMCPDependencies(
+        text: string,
+        repositoryId: string,
+    ): ContextDependency[] {
+        const mcpDependencies: ContextDependency[] = [];
+        const mcpRegex = /@mcp<([^|>]+)\|([^>]+)>/g;
+        let match;
+
+        this.logger.debug({
+            message: 'Extracting MCP dependencies from text',
+            context: PromptContextEngineService.name,
+            metadata: {
+                textLength: text.length,
+                textSnippet: text.substring(0, 200),
+                repositoryId,
+            },
+        });
+
+        while ((match = mcpRegex.exec(text)) !== null) {
+            const [fullMatch, app, tool] = match;
+            this.logger.log({
+                message: 'Found MCP dependency',
+                context: PromptContextEngineService.name,
+                metadata: {
+                    fullMatch,
+                    app,
+                    tool,
+                    repositoryId,
+                },
+            });
+            mcpDependencies.push({
+                type: 'mcp',
+                id: `${app}|${tool}`,
+                metadata: {
+                    app,
+                    tool,
+                    originalText: fullMatch,
+                    repositoryId,
+                    detectedAt: new Date().toISOString(),
+                },
+            });
+        }
+
+        this.logger.debug({
+            message: 'MCP extraction completed',
+            context: PromptContextEngineService.name,
+            metadata: {
+                foundCount: mcpDependencies.length,
+            },
+        });
+
+        return mcpDependencies;
+    }
+
     private extractMarkers(
         promptText: string,
         references: IFileReference[],
@@ -567,10 +639,17 @@ export class PromptContextEngineService implements IPromptContextEngineService {
             }
         }
 
-        const regex = /@[A-Za-z0-9/_\-.]+/g;
-        const matches = promptText.match(regex);
-        if (matches) {
-            matches.forEach((match) => markers.add(match));
+        const fileRegex = /@[A-Za-z0-9/_\-.]+/g;
+        const fileMatches = promptText.match(fileRegex);
+        if (fileMatches) {
+            fileMatches.forEach((match) => markers.add(match));
+        }
+
+        // Detect MCP markers: @mcp<app|tool>
+        const mcpRegex = /@mcp<([^|>]+)\|([^>]+)>/g;
+        let mcpMatch;
+        while ((mcpMatch = mcpRegex.exec(promptText)) !== null) {
+            markers.add(mcpMatch[0]); // Add the full @mcp<app|tool> marker
         }
 
         return Array.from(markers.values());

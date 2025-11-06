@@ -27,8 +27,21 @@ export class ContextReferenceModel extends CoreModel {
     @Column({ type: 'jsonb', nullable: true })
     knowledgeRefs?: Array<{ itemId: string; version?: string }>;
 
+    @Column({ type: 'varchar', length: 256, nullable: true })
+    revisionId?: string;
+
     @Column({ type: 'jsonb', nullable: true })
     origin?: ContextRevisionActor;
+
+    @Column({
+        type: 'enum',
+        enum: ['pending', 'processing', 'completed', 'failed'],
+        nullable: true,
+    })
+    processingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+
+    @Column({ type: 'timestamp', nullable: true })
+    lastProcessedAt?: Date;
 
     @Column({ type: 'jsonb', nullable: true })
     metadata?: Record<string, unknown>;

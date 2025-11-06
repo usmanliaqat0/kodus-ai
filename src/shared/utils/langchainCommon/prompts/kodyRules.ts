@@ -79,7 +79,7 @@ If the panel is uncertain about a finding, treat it as non-violating and omit it
 };
 
 export const prompt_kodyrules_classifier_user = (payload: any) => {
-    const { patchWithLinesStr, kodyRules, externalReferencesMap } = payload;
+    const { patchWithLinesStr, kodyRules, externalReferencesMap, mcpResultsMap } = payload;
 
     let externalReferencesSection = '';
     if (externalReferencesMap && externalReferencesMap.size > 0) {
@@ -100,6 +100,19 @@ export const prompt_kodyrules_classifier_user = (payload: any) => {
         externalReferencesSection += '\n</externalReferences>\n';
     }
 
+    let mcpResultsSection = '';
+    if (mcpResultsMap && mcpResultsMap.size > 0) {
+        mcpResultsSection = '\n<mcpResults>';
+        mcpResultsMap.forEach((results: Record<string, unknown>, ruleUuid: string) => {
+            const rule = kodyRules.find((r: any) => r.uuid === ruleUuid);
+            if (rule) {
+                mcpResultsSection += `\n\nRule: ${rule.title} (${ruleUuid})`;
+                mcpResultsSection += `\nMCP Tool Outputs:\n${JSON.stringify(results, null, 2)}`;
+            }
+        });
+        mcpResultsSection += '\n</mcpResults>\n';
+    }
+
     return `
 <context>
 
@@ -112,6 +125,7 @@ ${patchWithLinesStr}
 ${JSON.stringify(kodyRules, null, 2)}
 </kodyRules>
 ${externalReferencesSection}
+${mcpResultsSection}
 Your output must always be a valid JSON. Under no circumstances should you output anything other than a JSON. Follow the exact format below without any additional text or explanation:
 
 <OUTPUT_FORMAT>

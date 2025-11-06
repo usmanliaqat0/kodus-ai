@@ -20,6 +20,7 @@ export interface IPromptContextEngineService {
         repositoryName: string;
         organizationAndTeamData: OrganizationAndTeamData;
         context?: 'rule' | 'instruction' | 'prompt';
+        detectionMode?: 'rule' | 'prompt';
         byokConfig?: BYOKConfig;
     }): Promise<{
         references: IFileReference[];
