@@ -10,7 +10,7 @@ import type {
 export interface MergeRequirementsOptions {
     /**
      * Quando true, requisitos declarados posteriormente (mais específicos)
-     * sobrescrevem os anteriores. Por padrão, o primeiro valor vence.
+     * sobrescrevem os anteriores. Por padrão, o último valor vence.
      */
     preferLatest?: boolean;
     /**

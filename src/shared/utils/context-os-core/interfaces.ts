@@ -17,6 +17,27 @@ export type SensitivityLevel = 'none' | 'low' | 'medium' | 'high';
 /** Classificação de confidencialidade usada para filtragem/controle de acesso. */
 export type ConfidentialityLevel = 'public' | 'internal' | 'restricted';
 
+/** Generic path type that includes predefined paths or custom string arrays. */
+export type ContextPath = string[];
+
+/**
+ * Convenções recomendadas para ContextPath (não obrigatórias):
+ *
+ * Para aplicações de análise de código:
+ * - ['kodyRule', ruleUuid] - regras específicas do Kody
+ * - ['category', 'bug'|'performance'|'security'] - categorias de problemas
+ * - ['severity', 'critical'|'high'|'medium'|'low'] - níveis de severidade
+ * - ['customInstructions', 'main'] - instruções personalizadas
+ * - ['generation', 'main'] - geração de conteúdo
+ *
+ * Para aplicações de suporte:
+ * - ['ticket', 'bug'|'feature'|'question'] - tipos de ticket
+ * - ['priority', 'urgent'|'high'|'normal'|'low'] - prioridades
+ * - ['channel', 'email'|'chat'|'phone'] - canais de contato
+ *
+ * Aplicações são livres para definir suas próprias convenções.
+ */
+
 /** Referência de origem de um item (arquivo, API, MCP, etc.). */
 export interface SourceRef {
     type: string;
@@ -33,6 +54,23 @@ export type LineageAction =
     | 'expired'
     | 'approved'
     | 'rollback';
+
+/**
+ * ActorRef - REFERÊNCIA BASE PARA QUALQUER TIPO DE ATOR NO SISTEMA
+ *
+ * Representação unificada de qualquer entidade que pode realizar ações no sistema.
+ * Serve como base para todos os tipos de ator (humanos, sistemas, agentes, etc).
+ */
+export interface ActorRef {
+    /** Tipo de ator (human, system, agent, service, etc). */
+    kind: string;
+    /** Identificador único opcional do ator. */
+    id?: string;
+    /** Nome legível do ator. */
+    name?: string;
+    /** Metadados específicos do tipo de ator. */
+    metadata?: Record<string, unknown>;
+}
 
 /** Atores que podem realizar ações de lineage. */
 export type LineageActor = 'ingestion' | 'human' | 'automation';
@@ -68,6 +106,7 @@ export interface KnowledgeItem {
         createdAt: number;
         updatedAt: number;
         lineage: LineageRecord[];
+        tenantId: string; // chave de isolamento multi-tenant obrigatória
         ownerId?: string;
         checksum?: string;
     };
@@ -164,6 +203,12 @@ export interface ContentSlice {
 export interface Candidate {
     item: KnowledgeItem;
     score: number;
+    /** rationale DEVE SER OBRIGATÓRIO PARA EXPLICABILIDADE
+     *
+     * Justificativa de por que este candidato foi selecionado e como ele contribui
+     * para o contexto. Essencial para auditoria, debugging e melhoria de qualidade.
+     * Seguindo as melhores práticas de Anthropic/Weaviate para context engineering explicável.
+     */
     rationale?: string;
     slices?: ContentSlice[];
     metadata?: Record<string, unknown>;
@@ -214,6 +259,12 @@ export interface ContextLayer {
     tokens: number;
     residence?: LayerResidence;
     content: unknown;
+    /** references DEVE SER OBRIGATÓRIO PARA AUDITORIA E EXPLICABILIDADE
+     *
+     * Lista de itens/slides que foram usados para construir esta camada.
+     * Essencial para rastrear provenance, debugging e compliance.
+     * Cada camada deve declarar explicitamente suas fontes de conhecimento.
+     */
     references: Array<{ itemId: string; sliceId?: string }>;
     metadata?: Record<string, unknown>;
 }
@@ -258,24 +309,39 @@ export interface ContextActionDescriptor {
     endpoint?: string;
 }
 
+/** Tipos comuns de consumidores de contexto */
 export type ContextConsumerKind =
-    | 'prompt'
-    | 'workflow'
-    | 'action'
-    | 'tool'
-    | 'agent'
-    | string;
+    | 'prompt' // Prompts de LLM (ex.: system prompts, custom instructions)
+    | 'workflow' // Workflows automatizados
+    | 'action' // Ações/triggers
+    | 'tool' // Ferramentas customizadas
+    | 'agent' // Agentes inteligentes
+    | string; // Extensível para domínios específicos
 
-export interface ContextConsumerRef {
-    id: string;
+/**
+ * ContextConsumerRef - Referência para quem consome contexto
+ *
+ * Convenções de uso:
+ * - kind: Define o tipo de consumidor ('prompt', 'workflow', 'agent', etc.)
+ * - metadata.path: Caminho hierárquico do consumidor (ex.: ['kodyRule', ruleId])
+ * - metadata.sourceType: Tipo específico da fonte ('kody_rule', 'custom_prompt', etc.)
+ * - id: Identificador único do consumidor no seu domínio
+ */
+export interface ContextConsumerRef extends ActorRef {
+    id: string; // Campo obrigatório para consumidores
     kind: ContextConsumerKind;
-    name?: string;
-    metadata?: Record<string, unknown>;
 }
 
 /**
- * Requisito de contexto versionado. Define quem consome, qual consulta deve ser
- * executada e quais ferramentas/camadas devem estar presentes antes da execução.
+ * ContextRequirement - CONTRATO IMUTÁVEL / VERSIONADO DE CONSUMO DE CONTEXTO
+ *
+ * Define quem consome, qual consulta deve ser executada e quais ferramentas/camadas
+ * devem estar presentes antes da execução. É a "especificação" do que um consumidor
+ * precisa para funcionar corretamente.
+ *
+ * SEMÂNTICA: Este é o contrato imutável/versionado que define as necessidades
+ * de contexto de uma entidade (prompt, workflow, etc). Ele especifica o quê,
+ * não como ou quando.
  */
 export interface ContextRequirement {
     /** Identificador único do requisito no escopo atual. */
@@ -309,10 +375,33 @@ export interface ContextRequirement {
     status?: 'active' | 'deprecated' | 'draft';
 }
 
-/** Representa uma dependência externa que precisa estar disponível no contexto. */
+/**
+ * ContextDependency - WHITELIST OFICIAL DE TOOLS/KNOWLEDGE PARA GOVERNANÇA
+ *
+ * Define dependências externas que precisam estar disponíveis no contexto runtime.
+ * Funciona como whitelist formal: um agente/prompt/workflow SÓ PODE usar ferramentas,
+ * knowledge ou MCPs que apareçam como ContextDependency ativos no seu pack/context.
+ *
+ * SEMÂNTICA DE GOVERNANÇA:
+ * - 'mcp': Ferramentas MCP registradas (controla superfície de ataque)
+ * - 'tool': Ferramentas customizadas do sistema
+ * - 'knowledge': Itens de conhecimento específicos
+ * - 'workflow': Workflows permitidos para chaining
+ * - 'prompt': Prompts que podem ser chamados
+ * - 'action': Ações customizadas permitidas
+ *
+ * QUALQUER tool/knowledge/MCP usado em runtime DEVE estar nesta whitelist.
+ */
 export interface ContextDependency {
     /** Categoria da dependência (tool, workflow, prompt, knowledge, etc.). */
-    type: 'tool' | 'mcp' | 'workflow' | 'prompt' | 'action' | 'knowledge' | string;
+    type:
+        | 'tool'
+        | 'mcp'
+        | 'workflow'
+        | 'prompt'
+        | 'action'
+        | 'knowledge'
+        | string;
     /** Identificador ou slug da dependência. */
     id: string;
     /** Definição/descriptor bruto da dependência (ex.: MCPToolReference). */
@@ -329,7 +418,7 @@ export interface ContextDependency {
 export interface ContextRevisionScope {
     /** Nome principal do escopo (ex.: 'global', 'tenant', 'prompt'). */
     level: string;
-    /** Mapa de identificadores relevantes (ex.: { repositoryId, directoryId }). */
+    /** Mapa de identificadores relevantes (ex.: { tenantId, repositoryId, directoryId }). */
     identifiers?: Record<string, string>;
     /** Caminho hierárquico opcional (tenant → projeto → prompt, etc.). */
     path?: Array<{ level: string; id: string }>;
@@ -337,18 +426,28 @@ export interface ContextRevisionScope {
     metadata?: Record<string, unknown>;
 }
 
+/**
+ * Convenção recomendada para ContextRevisionScope.identifiers:
+ * - tenantId: sempre presente para isolamento multi-tenant
+ * - Outros identificadores podem ser adicionados conforme necessário
+ */
+
 /** Identifica a origem/autoria de uma revisão (humano, automação, serviço). */
-export interface ContextRevisionActor {
+export interface ContextRevisionActor extends ActorRef {
     kind: 'human' | 'automation' | 'system' | string;
-    id?: string;
-    name?: string;
-    contact?: string;
-    metadata?: Record<string, unknown>;
+    contact?: string; // Campo específico para ContextRevisionActor
 }
 
 /**
- * Resultado de uma revisão persistida. Pode ser usado diretamente como "commit"
- * para preencher históricos, diff/rollback e telemetria.
+ * ContextRevisionLogEntry - EVENTO (COMMIT) QUE INTRODUZ/ATUALIZA REQUIREMENTS + PAYLOAD
+ *
+ * Representa um evento versionado que introduz ou atualiza requirements e seu payload
+ * associado. É o "commit" no git do context engineering - captura mudanças em um
+ * ponto no tempo.
+ *
+ * SEMÂNTICA: Este é o evento/histórico de mudanças. É a "fonte da verdade" para
+ * rastrear evolução de requirements ao longo do tempo. Contém o payload completo
+ * e metadados de auditoria.
  */
 export interface ContextRevisionLogEntry {
     /** Identificador do commit. */
@@ -387,6 +486,12 @@ export interface ContextPack {
     provenance?: LineageRecord[];
     constraints?: RetrievalQuery['constraints'];
     resources?: ContextResourceRef[];
+    /** requiredActions EXTENDE A WHITELIST DE GOVERNANÇA
+     *
+     * Lista de ações que podem ser executadas pelo agente neste contexto.
+     * Funciona como extensão da whitelist definida em dependencies - especifica
+     * exatamente quais ações estão permitidas e seus parâmetros de execução.
+     */
     requiredActions?: ContextActionDescriptor[];
     dependencies?: ContextDependency[];
     metadata?: Record<string, unknown>;

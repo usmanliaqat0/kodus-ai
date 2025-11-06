@@ -64,11 +64,8 @@ export interface IKodyRulesService extends IKodyRulesRepository {
         organizationId: string,
         ruleId: string,
         references: {
-            externalReferences?: IKodyRuleExternalReference[];
-            syncErrors?: IKodyRuleReferenceSyncError[];
-            referenceProcessingStatus?: KodyRuleProcessingStatus;
-            lastReferenceProcessedAt?: Date;
-            ruleHash?: string;
+            contextReferenceId?: string;
+            // Todos os outros campos de referência foram movidos para Context OS
         },
     ): Promise<IKodyRule | null>;
 

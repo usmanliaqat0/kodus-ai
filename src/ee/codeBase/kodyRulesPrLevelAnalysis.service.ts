@@ -224,22 +224,23 @@ export class KodyRulesPrLevelAnalysisService
 
         const rulesWithLoadedReferences = filteredKodyRules.filter((rule) => {
             const fullRule = rule as Partial<IKodyRule>;
-            if (!fullRule.externalReferences?.length) {
+            // If rule has no contextReferenceId, include it (no references to load)
+            if (!fullRule.contextReferenceId) {
                 return true;
             }
+            // If rule has contextReferenceId and was loaded successfully, include it
             if (fullRule.uuid && externalReferencesMap.has(fullRule.uuid)) {
                 return true;
             }
+            // Rule has contextReferenceId but failed to load - skip it
             this.logger.warn({
                 message:
-                    'Skipping PR-level rule with external references that failed to load',
+                    'Skipping PR-level rule with contextReferenceId that failed to load references',
                 context: KodyRulesPrLevelAnalysisService.name,
                 metadata: {
                     ruleUuid: fullRule.uuid,
                     ruleTitle: fullRule.title,
-                    referencePaths: fullRule.externalReferences.map(
-                        (r) => r.filePath,
-                    ),
+                    contextReferenceId: fullRule.contextReferenceId,
                     organizationAndTeamData,
                 },
             });

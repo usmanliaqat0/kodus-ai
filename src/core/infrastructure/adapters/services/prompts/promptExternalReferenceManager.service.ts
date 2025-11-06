@@ -316,7 +316,7 @@ export class PromptExternalReferenceManagerService
         const parsed = this.parseConfigKey(configKey);
         try {
             return await this.contextReferenceService.getLatestRevision(
-                'code_review_config',
+                'codeReviewConfig',
                 parsed.entityId,
             );
         } catch (error) {

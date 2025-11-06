@@ -1616,6 +1616,7 @@ function buildContextRevisionScope(options: {
         options;
 
     const identifiers: Record<string, string> = {
+        tenantId: organizationId, // tenant = organization (convenção padronizada)
         organizationId,
     };
     const path: Array<{ level: string; id: string }> = [

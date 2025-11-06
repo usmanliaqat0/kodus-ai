@@ -35,6 +35,7 @@ type KodyRuleInput = Required<
         | 'severity'
         | 'sourcePath'
         | 'sourceAnchor'
+        | 'contextReferenceId'
         | 'externalReferences'
         | 'syncErrors'
         | 'referenceProcessingStatus'

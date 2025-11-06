@@ -10,7 +10,12 @@ export enum KodyRuleProcessingStatus {
 export interface IKodyRuleReferenceSyncError {
     readonly fileName: string;
     readonly message: string;
-    readonly errorType: 'not_found' | 'invalid_path' | 'fetch_error' | 'file_too_large' | 'parsing_error';
+    readonly errorType:
+        | 'not_found'
+        | 'invalid_path'
+        | 'fetch_error'
+        | 'file_too_large'
+        | 'parsing_error';
     readonly attemptedPaths?: string[];
     readonly timestamp: Date;
 }
@@ -44,11 +49,8 @@ export interface IKodyRule {
     scope?: KodyRulesScope;
     directoryId?: string;
     inheritance?: IKodyRulesInheritance;
-    externalReferences?: IKodyRuleExternalReference[];
-    syncErrors?: IKodyRuleReferenceSyncError[]; // Array detalhado de erros
-    referenceProcessingStatus?: KodyRuleProcessingStatus; // Status do processamento das referências
-    lastReferenceProcessedAt?: Date; // Última vez que as referências foram processadas
-    ruleHash?: string; // Hash da regra para evitar reprocessamento
+    contextReferenceId?: string; // Link com Context OS - única referência mantida na kodyRule
+    // Todos os outros campos de referência foram movidos para Context OS
 }
 
 export interface IKodyRulesExtendedContext {
@@ -121,34 +123,43 @@ export const kodyRulesInheritanceSchema = z.object({
 export const kodyRuleExternalReferenceSchema = z.object({
     filePath: z.string(),
     originalText: z.string().optional(),
-    lineRange: z.object({
-        start: z.number(),
-        end: z.number(),
-    }).optional(),
+    lineRange: z
+        .object({
+            start: z.number(),
+            end: z.number(),
+        })
+        .optional(),
     description: z.string().optional(),
     repositoryName: z.string().optional(),
     lastContentHash: z.string().optional(),
     lastValidatedAt: z.date().optional(),
     estimatedTokens: z.number().optional(),
-    lastFetchError: z.object({
-        message: z.string(),
-        errorType: z.string(),
-        timestamp: z.date(),
-    }).optional(),
+    lastFetchError: z
+        .object({
+            message: z.string(),
+            errorType: z.string(),
+            timestamp: z.date(),
+        })
+        .optional(),
 });
 
 export const kodyRuleReferenceSyncErrorSchema = z.object({
     fileName: z.string(),
     message: z.string(),
-    errorType: z.enum(['not_found', 'invalid_path', 'fetch_error', 'file_too_large', 'parsing_error']),
+    errorType: z.enum([
+        'not_found',
+        'invalid_path',
+        'fetch_error',
+        'file_too_large',
+        'parsing_error',
+    ]),
     attemptedPaths: z.array(z.string()).optional(),
     timestamp: z.date(),
 });
 
-const kodyRuleProcessingStatusSchema = z.enum([...Object.values(KodyRuleProcessingStatus)] as [
-    KodyRuleProcessingStatus,
-    ...KodyRuleProcessingStatus[],
-]);
+const kodyRuleProcessingStatusSchema = z.enum([
+    ...Object.values(KodyRuleProcessingStatus),
+] as [KodyRuleProcessingStatus, ...KodyRuleProcessingStatus[]]);
 
 const kodyRulesOriginSchema = z.enum([...Object.values(KodyRulesOrigin)] as [
     KodyRulesOrigin,
@@ -186,9 +197,6 @@ export const kodyRuleSchema = z.object({
     scope: kodyRulesScopeSchema.optional(),
     inheritance: kodyRulesInheritanceSchema.optional(),
     directoryId: z.string().optional(),
-    externalReferences: z.array(kodyRuleExternalReferenceSchema).optional(),
-    syncErrors: z.array(kodyRuleReferenceSyncErrorSchema).optional(),
-    referenceProcessingStatus: kodyRuleProcessingStatusSchema.optional(),
-    lastReferenceProcessedAt: z.date().optional(),
-    ruleHash: z.string().optional(),
+    contextReferenceId: z.string().optional(),
+    // Todos os outros campos de referência foram movidos para Context OS
 });

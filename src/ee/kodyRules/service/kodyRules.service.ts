@@ -390,13 +390,21 @@ export class KodyRulesService implements IKodyRulesService {
         organizationId: string,
         ruleId: string,
         references: {
-            externalReferences?: IKodyRuleExternalReference[];
-            syncErrors?: IKodyRuleReferenceSyncError[];
-            referenceProcessingStatus?: KodyRuleProcessingStatus;
-            lastReferenceProcessedAt?: Date;
-            ruleHash?: string;
+            contextReferenceId?: string;
+            // Todos os outros campos de referência foram movidos para Context OS
         },
     ): Promise<IKodyRule | null> {
+        this.logger.log({
+            message: 'KodyRulesService.updateRuleReferences called',
+            context: KodyRulesService.name,
+            metadata: {
+                organizationId,
+                ruleId,
+                contextReferenceId: references.contextReferenceId,
+                strategy: 'context-os-only', // Todos os campos de referência ficam no Context OS
+            },
+        });
+
         const existing = await this.findByOrganizationId(organizationId);
 
         if (!existing) {
@@ -415,11 +423,8 @@ export class KodyRulesService implements IKodyRulesService {
 
         const updatedRule = {
             ...existingRule,
-            externalReferences: references.externalReferences,
-            syncErrors: references.syncErrors,
-            referenceProcessingStatus: references.referenceProcessingStatus,
-            lastReferenceProcessedAt: references.lastReferenceProcessedAt,
-            ruleHash: references.ruleHash,
+            contextReferenceId: references.contextReferenceId,
+            // Todos os outros campos de referência foram movidos para Context OS
             updatedAt: new Date(),
         } as IKodyRule;
 

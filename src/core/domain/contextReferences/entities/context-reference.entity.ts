@@ -14,7 +14,14 @@ export class ContextReferenceEntity implements Entity<IContextReference> {
     private _entityId: string;
     private _requirements?: ContextRequirement[];
     private _knowledgeRefs?: Array<{ itemId: string; version?: string }>;
+    private _revisionId?: string;
     private _origin?: ContextRevisionActor;
+    private _processingStatus?:
+        | 'pending'
+        | 'processing'
+        | 'completed'
+        | 'failed';
+    private _lastProcessedAt?: Date;
     private _createdAt?: Date;
     private _updatedAt?: Date;
     private _metadata?: Record<string, unknown>;
@@ -29,7 +36,10 @@ export class ContextReferenceEntity implements Entity<IContextReference> {
         this._entityId = contextReference.entityId;
         this._requirements = contextReference.requirements;
         this._knowledgeRefs = contextReference.knowledgeRefs;
+        this._revisionId = contextReference.revisionId;
         this._origin = contextReference.origin;
+        this._processingStatus = contextReference.processingStatus;
+        this._lastProcessedAt = contextReference.lastProcessedAt;
         this._createdAt = contextReference.createdAt;
         this._updatedAt = contextReference.updatedAt;
         this._metadata = contextReference.metadata;
@@ -61,7 +71,6 @@ export class ContextReferenceEntity implements Entity<IContextReference> {
         return this._entityId;
     }
 
-
     public get requirements() {
         return this._requirements;
     }
@@ -86,6 +95,18 @@ export class ContextReferenceEntity implements Entity<IContextReference> {
         return this._metadata;
     }
 
+    public get revisionId() {
+        return this._revisionId;
+    }
+
+    public get processingStatus() {
+        return this._processingStatus;
+    }
+
+    public get lastProcessedAt() {
+        return this._lastProcessedAt;
+    }
+
     public toObject(): IContextReference {
         return {
             uuid: this._uuid,
@@ -95,7 +116,10 @@ export class ContextReferenceEntity implements Entity<IContextReference> {
             entityId: this._entityId,
             requirements: this._requirements,
             knowledgeRefs: this._knowledgeRefs,
+            revisionId: this._revisionId,
             origin: this._origin,
+            processingStatus: this._processingStatus,
+            lastProcessedAt: this._lastProcessedAt,
             createdAt: this._createdAt,
             updatedAt: this._updatedAt,
             metadata: this._metadata,
@@ -111,7 +135,10 @@ export class ContextReferenceEntity implements Entity<IContextReference> {
             entityId: this._entityId,
             requirements: this._requirements,
             knowledgeRefs: this._knowledgeRefs,
+            revisionId: this._revisionId,
             origin: this._origin,
+            processingStatus: this._processingStatus,
+            lastProcessedAt: this._lastProcessedAt,
             createdAt: this._createdAt,
             updatedAt: this._updatedAt,
             metadata: this._metadata,

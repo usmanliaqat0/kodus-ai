@@ -15,7 +15,8 @@ import {
     IGetAdditionalInfoHelper,
     GET_ADDITIONAL_INFO_HELPER_TOKEN,
 } from '@/shared/domain/contracts/getAdditionalInfo.helper.contract';
-import { KodyRuleProcessingStatus } from '@/core/domain/kodyRules/interfaces/kodyRules.interface';
+import { PromptSourceType } from '@/core/domain/prompts/interfaces/promptExternalReference.interface';
+import { ContextReferenceDetectionService } from '@/core/infrastructure/adapters/services/context/context-reference-detection.service';
 
 @Injectable()
 export class CreateOrUpdateKodyRulesUseCase {
@@ -36,6 +37,7 @@ export class CreateOrUpdateKodyRulesUseCase {
 
         private readonly authorizationService: AuthorizationService,
         private readonly externalReferenceDetectorService: ExternalReferenceDetectorService,
+        private readonly contextReferenceDetectionService: ContextReferenceDetectionService,
         @Inject(GET_ADDITIONAL_INFO_HELPER_TOKEN)
         private readonly getAdditionalInfoHelper: IGetAdditionalInfoHelper,
     ) {}
@@ -83,15 +85,21 @@ export class CreateOrUpdateKodyRulesUseCase {
 
             // ✅ Se tem repositoryId e rule text, processa referências
             if (result.uuid && kodyRule.repositoryId && kodyRule.rule) {
-                // ✅ Marca como PENDING antes de processar
-                await this.kodyRulesService.updateRuleReferences(
-                    organizationAndTeamData.organizationId,
-                    result.uuid,
-                    {
-                        referenceProcessingStatus: KodyRuleProcessingStatus.PENDING,
+                this.logger.log({
+                    message:
+                        'Rule created/updated, triggering reference detection',
+                    context: CreateOrUpdateKodyRulesUseCase.name,
+                    metadata: {
+                        ruleId: result.uuid,
+                        ruleTitle: kodyRule.title,
+                        repositoryId: kodyRule.repositoryId,
+                        hasRuleText: !!kodyRule.rule,
+                        ruleTextLength: kodyRule.rule.length,
+                        organizationAndTeamData,
                     },
-                );
+                });
 
+                // ✅ Processa referências (status fica no Context OS)
                 this.detectAndSaveReferencesAsync(
                     result.uuid,
                     kodyRule.rule,
@@ -109,6 +117,19 @@ export class CreateOrUpdateKodyRulesUseCase {
                             organizationAndTeamData,
                         },
                     });
+                });
+            } else {
+                this.logger.warn({
+                    message:
+                        'Reference detection skipped - missing required fields',
+                    context: CreateOrUpdateKodyRulesUseCase.name,
+                    metadata: {
+                        ruleId: result.uuid,
+                        hasRepositoryId: !!kodyRule.repositoryId,
+                        hasRuleText: !!kodyRule.rule,
+                        repositoryId: kodyRule.repositoryId,
+                        organizationAndTeamData,
+                    },
                 });
             }
 
@@ -141,11 +162,16 @@ export class CreateOrUpdateKodyRulesUseCase {
                 try {
                     let repositoryName: string;
                     try {
-                        repositoryName =
-                            await this.getAdditionalInfoHelper.getRepositoryNameByOrganizationAndRepository(
-                                organizationAndTeamData.organizationId,
-                                repositoryId,
-                            );
+                        // Para repositoryId "global", usar o próprio ID como nome
+                        if (repositoryId === 'global') {
+                            repositoryName = 'global';
+                        } else {
+                            repositoryName =
+                                await this.getAdditionalInfoHelper.getRepositoryNameByOrganizationAndRepository(
+                                    organizationAndTeamData.organizationId,
+                                    repositoryId,
+                                );
+                        }
                     } catch (error) {
                         this.logger.warn({
                             message:
@@ -153,102 +179,48 @@ export class CreateOrUpdateKodyRulesUseCase {
                             context: CreateOrUpdateKodyRulesUseCase.name,
                             error,
                             metadata: {
+                                repositoryId,
                                 organizationAndTeamData,
                             },
                         });
                         repositoryName = repositoryId;
                     }
 
-                    this.logger.log({
-                        message:
-                            'Starting background detection of external references',
-                        context: CreateOrUpdateKodyRulesUseCase.name,
-                        metadata: {
-                            ruleId,
-                            repositoryId,
-                            repositoryName,
-                            organizationAndTeamData,
-                        },
+                    // ✅ Usa o serviço compartilhado para detecção e salvamento
+                    const contextReferenceId = await this.contextReferenceDetectionService.detectAndSaveReferences({
+                        entityType: 'kodyRule',
+                        entityId: ruleId,
+                        text: ruleText,
+                        path: ['kodyRule', ruleId],
+                        sourceType: PromptSourceType.KODY_RULE,
+                        repositoryId,
+                        repositoryName,
+                        organizationAndTeamData,
+                        detectionMode: 'rule',
                     });
 
-                    const { references, syncErrors, ruleHash } =
-                        await this.externalReferenceDetectorService.detectAndResolveReferences(
-                            {
-                                ruleText,
-                                repositoryId,
-                                repositoryName,
-                                organizationAndTeamData,
-                            },
-                        );
-
-                    // ✅ Determina o status final
-                    let finalStatus: KodyRuleProcessingStatus | undefined;
-                    
-                    if (syncErrors && syncErrors.length > 0) {
-                        // Tem erros = FAILED
-                        finalStatus = KodyRuleProcessingStatus.FAILED;
-                    } else if (references.length > 0) {
-                        // Tem referências = COMPLETED
-                        finalStatus = KodyRuleProcessingStatus.COMPLETED;
-                    } else {
-                        // Sem referências E sem erros = Remove status (undefined)
-                        finalStatus = undefined;
-                    }
-
-                    // ✅ USA O NOVO MÉTODO que só atualiza as referências
+                    // ✅ Atualiza apenas o contextReferenceId na kodyRule
                     await this.kodyRulesService.updateRuleReferences(
                         organizationAndTeamData.organizationId,
                         ruleId,
                         {
-                            externalReferences:
-                                references.length > 0 ? references : undefined,
-                            syncErrors:
-                                syncErrors && syncErrors.length > 0
-                                    ? syncErrors
-                                    : undefined,
-                            referenceProcessingStatus: finalStatus,
-                            lastReferenceProcessedAt: finalStatus ? new Date() : undefined,
-                            ruleHash,
+                            contextReferenceId,
                         },
                     );
 
-                    if (syncErrors && syncErrors.length > 0) {
-                        this.logger.warn({
-                            message: 'Rule updated with sync errors',
-                            context: CreateOrUpdateKodyRulesUseCase.name,
-                            metadata: {
-                                ruleId,
-                                syncErrors,
-                                errorCount: syncErrors.length,
-                                organizationAndTeamData,
-                            },
-                        });
-                    } else if (references.length > 0) {
-                        this.logger.log({
-                            message:
-                                'Successfully updated rule with detected external references',
-                            context: CreateOrUpdateKodyRulesUseCase.name,
-                            metadata: {
-                                ruleId,
-                                referencesCount: references.length,
-                                paths: references.map((r) => r.filePath),
-                                organizationAndTeamData,
-                            },
-                        });
-                    } else {
-                        this.logger.log({
-                            message: 'No external references detected for rule',
-                            context: CreateOrUpdateKodyRulesUseCase.name,
-                            metadata: {
-                                ruleId,
-                                organizationAndTeamData,
-                            },
-                        });
-                    }
+                    this.logger.log({
+                        message: 'KodyRule successfully processed with Context OS',
+                        context: CreateOrUpdateKodyRulesUseCase.name,
+                        metadata: {
+                            ruleId,
+                            contextReferenceId,
+                            repositoryId,
+                        },
+                    });
+
                 } catch (error) {
-                    this.logger.warn({
-                        message:
-                            'Failed to detect external references in background',
+                    this.logger.error({
+                        message: 'Failed to process kodyRule with Context OS',
                         context: CreateOrUpdateKodyRulesUseCase.name,
                         error,
                         metadata: {
@@ -258,6 +230,7 @@ export class CreateOrUpdateKodyRulesUseCase {
                         },
                     });
                 }
+
                 resolve();
             });
         });

@@ -51,7 +51,6 @@ import {
 } from '@/core/domain/codeBase/contracts/CodeBaseConfigService.contract';
 import { ObservabilityService } from '@/core/infrastructure/adapters/services/logger/observability.service';
 import { BYOKPromptRunnerService } from '@/shared/infrastructure/services/tokenTracking/byokPromptRunner.service';
-import { ConfigLevel } from '@/config/types/general/pullRequestMessages.type';
 import { ExternalReferenceLoaderService } from '@/core/infrastructure/adapters/services/kodyRules/externalReferenceLoader.service';
 import type { ContextAugmentationsMap } from '@/core/infrastructure/adapters/services/context/code-review-context-pack.service';
 import type { ContextPack } from '@context-os-core/interfaces';
@@ -80,6 +79,7 @@ interface KodyRulesExtendedContext {
     updatedSuggestions?: AIAnalysisResult;
     filteredKodyRules?: Array<Partial<IKodyRule>>;
     externalReferencesMap?: Map<string, any[]>;
+    mcpResultsMap?: Map<string, Record<string, unknown>>;
 }
 
 export const KODY_RULES_ANALYSIS_SERVICE_TOKEN = Symbol(
@@ -429,26 +429,27 @@ export class KodyRulesAnalysisService implements IKodyRulesAnalysisService {
                 context,
             );
 
-        // Filter out rules that have external references but failed to load
+        // Filter out rules that have contextReferenceId but failed to load references
         const rulesWithLoadedReferences = baseContext.kodyRules.filter(
             (rule) => {
                 const fullRule = rule as Partial<IKodyRule>;
-                if (!fullRule.externalReferences?.length) {
+                // If rule has no contextReferenceId, include it (no references to load)
+                if (!fullRule.contextReferenceId) {
                     return true;
                 }
+                // If rule has contextReferenceId and was loaded successfully, include it
                 if (fullRule.uuid && externalReferencesMap.has(fullRule.uuid)) {
                     return true;
                 }
+                // Rule has contextReferenceId but failed to load - skip it
                 this.logger.warn({
                     message:
-                        'Skipping rule with external references that failed to load',
+                        'Skipping rule with contextReferenceId that failed to load references',
                     context: KodyRulesAnalysisService.name,
                     metadata: {
                         ruleUuid: fullRule.uuid,
                         ruleTitle: fullRule.title,
-                        referencePaths: fullRule.externalReferences.map(
-                            (r) => r.filePath,
-                        ),
+                        contextReferenceId: fullRule.contextReferenceId,
                     },
                 });
                 return false;
@@ -470,12 +471,19 @@ export class KodyRulesAnalysisService implements IKodyRulesAnalysisService {
 
         baseContext.kodyRules = rulesWithLoadedReferences;
 
+        // 4) Execute MCPs for rules that have contextReferenceId
+        const mcpResultsMap = await this.executeMCPsForRules(
+            baseContext.kodyRules,
+            context,
+        );
+
         let extendedContext = {
             ...baseContext,
             standardSuggestions: hasCodeSuggestions ? suggestions : undefined,
             updatedSuggestions: undefined,
             filteredKodyRules: undefined,
             externalReferencesMap,
+            mcpResultsMap,
         };
 
         const runName = 'kodyRulesAnalyzeCodeWithAI';
@@ -907,7 +915,6 @@ export class KodyRulesAnalysisService implements IKodyRulesAnalysisService {
                 rule: rule?.rule,
                 severity: rule?.severity,
                 examples: rule?.examples ?? [],
-                externalReferences: rule?.externalReferences ?? [],
             }));
 
         const baseContext = {
@@ -936,10 +943,9 @@ export class KodyRulesAnalysisService implements IKodyRulesAnalysisService {
                 context?.sharedSanitizedOverrides ??
                 context?.codeReviewConfig?.v2PromptOverrides,
             externalPromptLayers: context?.externalPromptLayers,
-            contextAugmentations:
-                context?.sharedContextAugmentations as
-                    | ContextAugmentationsMap
-                    | undefined,
+            contextAugmentations: context?.sharedContextAugmentations as
+                | ContextAugmentationsMap
+                | undefined,
             contextPack: context?.sharedContextPack as ContextPack | undefined,
         };
 
@@ -1221,6 +1227,35 @@ export class KodyRulesAnalysisService implements IKodyRulesAnalysisService {
             });
             return null;
         }
+    }
+
+    private async executeMCPsForRules(
+        rules: Array<Partial<IKodyRule>>,
+        context: AnalysisContext,
+    ): Promise<Map<string, Record<string, unknown>>> {
+        const mcpResultsMap = new Map<string, Record<string, unknown>>();
+
+        // TODO: Implement MCP execution for kodyRules
+        // This requires:
+        // 1. Inject IContextReferenceService to fetch requirements by contextReferenceId
+        // 2. MCPManagerService to fetch connections
+        // 3. Create MCPRegistry and register tools
+        // 4. Create MCPClient with adapter
+        // 5. Create MCPOrchestrator and execute tools
+        // 6. Map results back to mcpResultsMap
+        // For now, MCPs detected in rules are stored in context-references
+        // but not executed during analysis. This will be implemented in a future iteration.
+
+        this.logger.debug({
+            message: 'MCP execution for kodyRules not yet implemented',
+            context: KodyRulesAnalysisService.name,
+            metadata: {
+                rulesCount: rules.length,
+                hasContextAugmentations: !!context.sharedContextAugmentations,
+            },
+        });
+
+        return mcpResultsMap;
     }
 
     private buildTags(

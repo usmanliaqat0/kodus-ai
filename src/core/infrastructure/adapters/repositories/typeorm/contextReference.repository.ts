@@ -16,7 +16,10 @@ function modelToEntity(model: ContextReferenceModel): ContextReferenceEntity {
         entityId: model.entityId,
         requirements: model.requirements ?? undefined,
         knowledgeRefs: model.knowledgeRefs ?? undefined,
+        revisionId: model.revisionId ?? undefined,
         origin: model.origin ?? undefined,
+        processingStatus: model.processingStatus ?? undefined,
+        lastProcessedAt: model.lastProcessedAt ?? undefined,
         createdAt: model.createdAt,
         updatedAt: model.updatedAt,
         metadata: model.metadata ?? undefined,
@@ -71,7 +74,10 @@ export class ContextReferenceRepository implements IContextReferenceRepository {
                 entityId: contextReference.entityId,
                 requirements: contextReference.requirements,
                 knowledgeRefs: contextReference.knowledgeRefs,
+                revisionId: contextReference.revisionId,
                 origin: contextReference.origin,
+                processingStatus: contextReference.processingStatus,
+                lastProcessedAt: contextReference.lastProcessedAt,
                 metadata: contextReference.metadata,
             });
 

@@ -1,8 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { IKodyRule } from '@/core/domain/kodyRules/interfaces/kodyRules.interface';
 import { AnalysisContext } from '@/config/types/general/codeReview.type';
 import { PinoLoggerService } from '@/core/infrastructure/adapters/services/logger/pino.service';
 import { CodeManagementService } from '@/core/infrastructure/adapters/services/platformIntegration/codeManagement.service';
+import {
+    CONTEXT_REFERENCE_SERVICE_TOKEN,
+    IContextReferenceService,
+} from '@/core/domain/contextReferences/contracts/context-reference.service.contract';
 
 export interface LoadedReference {
     filePath: string;
@@ -15,118 +19,171 @@ export class ExternalReferenceLoaderService {
     constructor(
         private readonly codeManagementService: CodeManagementService,
         private readonly logger: PinoLoggerService,
+        @Inject(CONTEXT_REFERENCE_SERVICE_TOKEN)
+        private readonly contextReferenceService: IContextReferenceService,
     ) {}
 
     async loadReferences(
         rule: IKodyRule,
         context: AnalysisContext,
     ): Promise<LoadedReference[]> {
-        if (!rule.externalReferences || rule.externalReferences.length === 0) {
+        // Load from context-references (Context OS)
+        if (rule.contextReferenceId) {
+            try {
+                return await this.loadFromContextReference(rule, context);
+            } catch (error) {
+                this.logger.warn({
+                    message: 'Failed to load from context-references',
+                    context: ExternalReferenceLoaderService.name,
+                    error,
+                    metadata: {
+                        ruleUuid: rule.uuid,
+                        contextReferenceId: rule.contextReferenceId,
+                    },
+                });
+                return [];
+            }
+        }
+
+        // No contextReferenceId - nothing to load
+        this.logger.debug({
+            message:
+                'Rule has no contextReferenceId, skipping reference loading',
+            context: ExternalReferenceLoaderService.name,
+            metadata: {
+                ruleUuid: rule.uuid,
+            },
+        });
+        return [];
+    }
+
+    private async loadFromContextReference(
+        rule: IKodyRule,
+        context: AnalysisContext,
+    ): Promise<LoadedReference[]> {
+        const contextRef = await this.contextReferenceService.findById(
+            rule.contextReferenceId!,
+        );
+
+        if (!contextRef?.requirements?.[0]?.dependencies) {
             return [];
         }
 
         const loadedReferences: LoadedReference[] = [];
 
-        for (const ref of rule.externalReferences) {
-            try {
-                const fileContent =
-                    await this.codeManagementService.getRepositoryContentFile({
-                        organizationAndTeamData:
-                            context.organizationAndTeamData,
-                        repository: {
-                            id: context.repository.id || '',
-                            name: context.repository.name || '',
-                        },
-                        file: { filename: ref.filePath },
-                        pullRequest: context.pullRequest,
-                    });
+        // Load KNOWLEDGE dependencies (files)
+        const knowledgeDeps = contextRef.requirements[0].dependencies.filter(
+            (dep) => dep.type === 'knowledge',
+        );
 
-                if (fileContent?.data?.content) {
-                    let content = fileContent.data.content;
+        for (const dep of knowledgeDeps) {
+            const filePath = dep.metadata?.filePath as string;
+            const lineRange = dep.metadata?.lineRange as
+                | { start: number; end: number }
+                | undefined;
+            const description = dep.metadata?.description as string | undefined;
 
-                    if (fileContent.data.encoding === 'base64') {
-                        content = Buffer.from(content, 'base64').toString(
-                            'utf-8',
-                        );
-                    }
-                    
-                    if (ref.lineRange) {
-                        const extractedContent = this.extractLineRange(
-                            content,
-                            ref.lineRange,
-                        );
+            if (!filePath) continue;
 
-                        if (
-                            !extractedContent ||
-                            extractedContent.trim().length === 0
-                        ) {
-                        this.logger.warn({
-                            message:
-                                'Line range extraction returned empty content, falling back to full file',
-                            context: ExternalReferenceLoaderService.name,
-                            metadata: {
-                                filePath: ref.filePath,
-                                requestedRange: ref.lineRange,
-                                totalLines: content.split('\n').length,
-                                organizationAndTeamData: context.organizationAndTeamData,
-                            },
-                        });
-                            // Fallback: usa arquivo completo
-                        } else {
-                            content = extractedContent;
-                        }
-                    }
+            const content = await this.fetchFileContent(
+                filePath,
+                lineRange,
+                context,
+            );
+            if (content) {
+                loadedReferences.push({
+                    filePath,
+                    content,
+                    description,
+                });
 
-                    loadedReferences.push({
-                        filePath: ref.filePath,
-                        content,
-                        description: ref.description,
-                    });
-
-                    this.logger.log({
-                        message: 'Successfully loaded external reference',
-                        context: ExternalReferenceLoaderService.name,
-                        metadata: {
-                            filePath: ref.filePath,
-                            ruleUuid: rule.uuid,
-                            contentLength: content.length,
-                            hasLineRange: !!ref.lineRange,
-                            lineRange: ref.lineRange,
-                            organizationAndTeamData:
-                                context.organizationAndTeamData,
-                        },
-                    });
-                } else {
-                    this.logger.warn({
-                        message:
-                            'External reference file found but content is empty',
-                        context: ExternalReferenceLoaderService.name,
-                        metadata: {
-                            filePath: ref.filePath,
-                            ruleUuid: rule.uuid,
-                            organizationAndTeamData:
-                                context.organizationAndTeamData,
-                        },
-                    });
-                }
-            } catch (error) {
-                this.logger.error({
-                    message: 'Failed to load external reference file',
+                this.logger.log({
+                    message: 'Successfully loaded reference from Context OS',
                     context: ExternalReferenceLoaderService.name,
-                    error,
                     metadata: {
-                        filePath: ref.filePath,
+                        filePath,
                         ruleUuid: rule.uuid,
-                        repository: context.repository?.name,
-                        pullRequest: context.pullRequest?.number,
-                        organizationAndTeamData:
-                            context.organizationAndTeamData,
+                        contentLength: content.length,
+                        hasLineRange: !!lineRange,
                     },
                 });
             }
         }
 
         return loadedReferences;
+    }
+
+    private async loadFromLegacyReferences(
+        rule: IKodyRule,
+        context: AnalysisContext,
+    ): Promise<LoadedReference[]> {
+        // Legacy loading removed - externalReferences field no longer exists
+        return [];
+    }
+
+    private async fetchFileContent(
+        filePath: string,
+        lineRange: { start: number; end: number } | undefined,
+        context: AnalysisContext,
+    ): Promise<string | null> {
+        try {
+            const fileContent =
+                await this.codeManagementService.getRepositoryContentFile({
+                    organizationAndTeamData: context.organizationAndTeamData,
+                    repository: {
+                        id: context.repository.id || '',
+                        name: context.repository.name || '',
+                    },
+                    file: { filename: filePath },
+                    pullRequest: context.pullRequest,
+                });
+
+            if (!fileContent?.data?.content) {
+                return null;
+            }
+
+            let content = fileContent.data.content;
+
+            if (fileContent.data.encoding === 'base64') {
+                content = Buffer.from(content, 'base64').toString('utf-8');
+            }
+
+            if (lineRange) {
+                const extractedContent = this.extractLineRange(
+                    content,
+                    lineRange,
+                );
+
+                if (!extractedContent || extractedContent.trim().length === 0) {
+                    this.logger.warn({
+                        message:
+                            'Line range extraction returned empty content, falling back to full file',
+                        context: ExternalReferenceLoaderService.name,
+                        metadata: {
+                            filePath,
+                            requestedRange: lineRange,
+                            totalLines: content.split('\n').length,
+                        },
+                    });
+                    // Fallback: use full file
+                } else {
+                    content = extractedContent;
+                }
+            }
+
+            return content;
+        } catch (error) {
+            this.logger.error({
+                message: 'Failed to fetch file content',
+                context: ExternalReferenceLoaderService.name,
+                error,
+                metadata: {
+                    filePath,
+                    repository: context.repository?.name,
+                },
+            });
+            return null;
+        }
     }
 
     private extractLineRange(

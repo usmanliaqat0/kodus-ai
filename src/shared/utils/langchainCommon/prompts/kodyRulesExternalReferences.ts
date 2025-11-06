@@ -5,10 +5,12 @@ export const kodyRulesDetectReferencesSchema = z.object({
         z.object({
             fileName: z.string(),
             originalText: z.string().optional(), // Texto original da referência
-            lineRange: z.object({
-                start: z.number(),
-                end: z.number(),
-            }).optional(), // Range de linhas (ex: #L10-L20)
+            lineRange: z
+                .object({
+                    start: z.number(),
+                    end: z.number(),
+                })
+                .optional(), // Range de linhas (ex: #L10-L20)
             filePattern: z.string().optional(),
             description: z.string().optional(),
             repositoryName: z.string().optional(),
@@ -21,21 +23,25 @@ export type KodyRulesDetectReferencesSchema = z.infer<
 >;
 
 export const prompt_kodyrules_detect_references_system = () => {
-    return `You are an expert at analyzing coding rules to identify when they require reading external file content for validation.
+    return `You are an expert at analyzing coding rules to identify when they require reading external file content.
 
 ## Core Principle
 
-A rule requires a file reference when validation depends on reading the ACTUAL DATA/VALUES inside that file.
+A rule requires a file reference when it:
+1. **VALIDATES** code against file content
+2. **USES** file content as context or guidelines
+3. **REFERENCES** specific files/docs to be considered
+4. **MENTIONS** files that should be read to understand the rule
 
-## Two Types of Validation
+## Two Types of File Usage
 
-**STRUCTURAL Validation (DO NOT DETECT):**
-The programming language, compiler, or type system enforces these automatically.
+**STRUCTURAL References (DO NOT DETECT):**
+The programming language, compiler, or type system handles these automatically.
 They involve code structure, types, interfaces, imports, or architectural patterns.
 
-**CONTENT Validation (DETECT):**
-An LLM or runtime validator must read the file to check if values, data, or documented rules are followed.
-The file contains information that cannot be validated by the compiler alone.
+**CONTENT References (DETECT):**
+The rule needs to read actual file content - whether for validation, context, or guidelines.
+This includes documentation, configuration files, examples, or any file mentioned as a reference.
 
 ## Decision Framework
 
@@ -52,9 +58,19 @@ Ask: "Is this file the target being validated, or the reference standard being c
 If TARGET (being modified/validated) → DO NOT detect
 If REFERENCE (source of truth) → DETECT
 
-Final check: "Does an LLM need to read this file to understand what values/rules to validate against?"
+Final check: "Does this rule mention a file that should be read to provide context or validate against?"
 If YES → detect
 If NO → ignore
+
+## Detection Criteria
+
+Detect file references when the rule text:
+- Explicitly mentions a file name or path
+- Indicates the file content should be read ("uses", "follows", "according to", "based on", "see")
+- Specifies a repository name along with a file
+- Uses explicit markers (@file:, @, file paths)
+
+Focus on the INTENT: if reading the file content would help understand or apply the rule, detect it.
 
 ## What to Extract
 
@@ -95,7 +111,6 @@ Output format:
 }
 
 Output ONLY valid JSON. No explanations.`;
-
 };
 
 export const prompt_kodyrules_detect_references_user = (payload: {
@@ -105,7 +120,7 @@ export const prompt_kodyrules_detect_references_user = (payload: {
 
 ${payload.rule}
 
-Analyze if this rule requires external file references for validation.
+Analyze if this rule requires external file references (for validation, context, or guidelines).
+Detect any files mentioned that should be read to understand or apply this rule.
 Return JSON with detected file references or empty array if none exist.`;
 };
-
