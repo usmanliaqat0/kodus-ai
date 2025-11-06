@@ -79,17 +79,17 @@ export class InitialCommentStage extends BasePipelineStage<CodeReviewPipelineCon
             pullRequestMessagesConfig?.startReviewMessage;
 
         if (
-            !startReviewMessage ||
-            startReviewMessage.status === PullRequestMessageStatus.OFF ||
-            startReviewMessage.status === PullRequestMessageStatus.INACTIVE
+            startReviewMessage?.status === PullRequestMessageStatus.OFF ||
+            startReviewMessage?.status === PullRequestMessageStatus.INACTIVE
         ) {
             this.logger.log({
-                message: `Skipping initial comment for PR#${context.pullRequest.number} because start review message is off`,
+                message: `Skipping initial comment for PR#${context.pullRequest.number} because start review message is off or inactive`,
                 context: this.stageName,
                 metadata: {
                     organizationAndTeamData: context.organizationAndTeamData,
                     prNumber: context.pullRequest.number,
                     repository: context.repository.name,
+                    status: startReviewMessage.status,
                 },
             });
 
@@ -99,7 +99,8 @@ export class InitialCommentStage extends BasePipelineStage<CodeReviewPipelineCon
         }
 
         if (
-            startReviewMessage.status === PullRequestMessageStatus.ONLY_WHEN_OPENED &&
+            startReviewMessage?.status ===
+                PullRequestMessageStatus.ONLY_WHEN_OPENED &&
             context.lastExecution
         ) {
             this.logger.log({
