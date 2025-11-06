@@ -721,6 +721,7 @@ ${lowText}
 - **NO potential issues** - Only report issues you can reproduce mentally with specific inputs
 - **NO "in production this could..."** - Must be able to prove it WILL happen, not that it COULD happen
 - **NO assuming missing code is wrong** - If code isn't shown, don't assume it exists or how it works
+- **NO analyze instruction files** - Remember that some files are not code files themselves, just instructions, so it doesn't make sense to analyze their contents as executable code
 - **NO indentation-related issues** - Never report issues where the root cause is indentation, spacing, or whitespace - even if you believe it causes syntax errors, parsing failures, or runtime crashes. Indentation problems are NOT bugs.
 - **ONLY report if you can provide**:
   1. Exact input values that trigger the issue
