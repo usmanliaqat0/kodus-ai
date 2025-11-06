@@ -27,7 +27,6 @@ import { FinishOnboardingUseCase } from '@/core/application/use-cases/platformIn
 import { DeleteIntegrationUseCase } from '@/core/application/use-cases/platformIntegration/codeManagement/delete-integration.use-case';
 import { DeleteIntegrationAndRepositoriesUseCase } from '@/core/application/use-cases/platformIntegration/codeManagement/delete-integration-and-repositories.use-case';
 import { GetRepositoryTreeUseCase } from '@/core/application/use-cases/platformIntegration/codeManagement/get-repository-tree.use-case';
-import { GetRepositoryTreeDto } from '../../dtos/get-repository-tree.dto';
 import { GetWebhookStatusUseCase } from '@/core/application/use-cases/platformIntegration/codeManagement/get-webhook-status.use-case';
 import { WebhookStatusQueryDto } from '../../dtos/webhook-status-query.dto';
 import {
@@ -64,7 +63,6 @@ export class CodeManagementController {
         private readonly finishOnboardingUseCase: FinishOnboardingUseCase,
         private readonly deleteIntegrationUseCase: DeleteIntegrationUseCase,
         private readonly deleteIntegrationAndRepositoriesUseCase: DeleteIntegrationAndRepositoriesUseCase,
-        private readonly getRepositoryTreeUseCase: GetRepositoryTreeUseCase,
         private readonly getRepositoryTreeByDirectoryUseCase: GetRepositoryTreeByDirectoryUseCase,
         private readonly getWebhookStatusUseCase: GetWebhookStatusUseCase,
     ) {}

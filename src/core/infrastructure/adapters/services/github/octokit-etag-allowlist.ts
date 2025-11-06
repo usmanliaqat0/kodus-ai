@@ -48,6 +48,8 @@ function buildResolvedKey(octokit: Octokit, options: any) {
     return `${(resolved.method || 'GET').toUpperCase()} ${resolved.url}#${accept}`;
 }
 
+const requestKeyMap = new WeakMap<any, string>();
+
 export function attachETagHooksAllowlist(
     octokit: Octokit,
     store: ETagStore,
@@ -59,9 +61,6 @@ export function attachETagHooksAllowlist(
         if (!isGet(options) || !allowlist?.length) {
             return;
         }
-        if ((options as any).__no_etag) {
-            return;
-        }
 
         const rule = matchRule(options, allowlist);
         if (!rule) {
@@ -69,7 +68,7 @@ export function attachETagHooksAllowlist(
         }
 
         const key = buildResolvedKey(octokit, options);
-        (options as any).__etag_cache_key = key;
+        requestKeyMap.set(options, key);
 
         const cached = await store.get<any>(key);
         const shouldCondition = !!(
@@ -94,8 +93,7 @@ export function attachETagHooksAllowlist(
         }
 
         const key =
-            (options as any).__etag_cache_key ??
-            buildResolvedKey(octokit, options);
+            requestKeyMap.get(options) ?? buildResolvedKey(octokit, options);
 
         const etag = response.headers?.etag as string | undefined;
         if (!etag) {
@@ -121,26 +119,21 @@ export function attachETagHooksAllowlist(
         }
 
         const key =
-            (options as any).__etag_cache_key ??
-            buildResolvedKey(octokit, options);
+            requestKeyMap.get(options) ?? buildResolvedKey(octokit, options);
 
         const cached = await store.get<any>(key);
         if (cached?.payload !== undefined) {
-            return {
+            const resp = error.response ?? {
                 status: 304,
-                headers: { etag: cached.etag },
-                data: cached.payload,
+                headers: {},
                 url: options.url,
+                data: undefined,
             };
+            return { ...resp, data: cached.payload };
         }
 
         const headers2 = { ...(options.headers || {}) };
         delete (headers2 as any)['If-None-Match'];
-
-        return octokit.request({
-            ...options,
-            headers: headers2,
-            __no_etag: true,
-        });
+        return octokit.request({ ...options, headers: headers2 });
     });
 }
