@@ -3555,7 +3555,7 @@ export class GitlabService
                 repository,
                 filters = {},
             } = params;
-
+    
             if (!repository?.id) {
                 this.logger.warn({
                     message: 'Repository ID is required to get all files',
@@ -3563,14 +3563,14 @@ export class GitlabService
                     serviceName: 'GitlabService getRepositoryAllFiles',
                     metadata: params,
                 });
-
+    
                 return [];
             }
-
+    
             const gitlabAuthDetail = await this.getAuthDetails(
                 organizationAndTeamData,
             );
-
+    
             if (!gitlabAuthDetail) {
                 this.logger.warn({
                     message: 'GitLab authentication details not found',
@@ -3578,26 +3578,26 @@ export class GitlabService
                     serviceName: 'GitlabService getRepositoryAllFiles',
                     metadata: params,
                 });
-
+    
                 return [];
             }
-
+    
             const gitlabAPI = this.instanceGitlabApi(gitlabAuthDetail);
-
+    
             const {
                 filePatterns,
                 excludePatterns,
                 maxFiles = 1000,
             } = filters ?? {};
-
+    
             let branch = filters?.branch;
-
+    
             if (!branch || branch.length === 0) {
                 branch = await this.getDefaultBranch({
                     organizationAndTeamData,
                     repository,
                 });
-
+    
                 if (!branch) {
                     this.logger.warn({
                         message: 'Default branch not found for repository',
@@ -3605,29 +3605,69 @@ export class GitlabService
                         serviceName: 'GitlabService getRepositoryAllFiles',
                         metadata: params,
                     });
-
+    
                     return [];
                 }
             }
-
-            const trees = await gitlabAPI.Repositories.allRepositoryTrees(
-                repository.id,
-                {
-                    ref: branch,
-                    recursive: true,
-                },
+    
+            // Extract base directories from filePatterns
+            const baseDirectories = this.extractBaseDirectoriesFromPatterns(
+                filePatterns || [],
             );
-
-            let files = trees
-                .filter((file) => file.type === 'blob')
-                .map((file) => this.transformRepositoryFile(file));
-
+    
+            let allFiles: RepositoryFile[] = [];
+    
+            // If we have specific directories, search only them
+            if (baseDirectories.length > 0) {
+                // Search files from each specific directory
+                for (const baseDir of baseDirectories) {
+                    try {
+                        const trees = await gitlabAPI.Repositories.allRepositoryTrees(
+                            repository.id,
+                            {
+                                ref: branch,
+                                path: baseDir,
+                                recursive: true, // Only search within this directory
+                            },
+                        );
+    
+                        const files = trees
+                            .filter((file) => file.type === 'blob')
+                            .map((file) => this.transformRepositoryFile(file));
+    
+                        allFiles.push(...files);
+                    } catch (dirError) {
+                        this.logger.warn({
+                            message: `Error fetching directory ${baseDir}`,
+                            context: GitlabService.name,
+                            error: dirError,
+                            metadata: { baseDir, repository: repository.name },
+                        });
+                        // Continue to the next directory
+                    }
+                }
+            } else {
+                // Fallback: if there are no specific patterns, search everything (original behavior)
+                const trees = await gitlabAPI.Repositories.allRepositoryTrees(
+                    repository.id,
+                    {
+                        ref: branch,
+                        recursive: true,
+                    },
+                );
+    
+                allFiles = trees
+                    .filter((file) => file.type === 'blob')
+                    .map((file) => this.transformRepositoryFile(file));
+            }
+    
+            // Filter files by patterns (if any pattern does not have a clear base directory)
             const filteredFiles: RepositoryFile[] = [];
-            for (const file of files) {
+            for (const file of allFiles) {
                 if (maxFiles > 0 && filteredFiles.length >= maxFiles) {
                     break;
                 }
-
+    
                 if (
                     filePatterns &&
                     filePatterns.length > 0 &&
@@ -3635,7 +3675,7 @@ export class GitlabService
                 ) {
                     continue;
                 }
-
+    
                 if (
                     excludePatterns &&
                     excludePatterns.length > 0 &&
@@ -3643,10 +3683,10 @@ export class GitlabService
                 ) {
                     continue;
                 }
-
+    
                 filteredFiles.push(file);
             }
-
+    
             this.logger.log({
                 message: `Retrieved ${filteredFiles.length} files from repository`,
                 context: GitlabService.name,
@@ -3654,9 +3694,10 @@ export class GitlabService
                 metadata: {
                     ...params,
                     retrievedFilesCount: filteredFiles.length,
+                    baseDirectoriesSearched: baseDirectories,
                 },
             });
-
+    
             return filteredFiles;
         } catch (error) {
             this.logger.error({
@@ -3666,9 +3707,49 @@ export class GitlabService
                 error: error.message,
                 metadata: params,
             });
-
+    
             return [];
         }
+    }
+    
+    private extractBaseDirectoriesFromPatterns(
+        patterns: string[],
+    ): string[] {
+        const globChars = ['*', '?', '{', '}', '[', ']', '!'];
+        const baseDirs = new Set<string>();
+    
+        for (const pattern of patterns) {
+            const normalized = pattern
+                .replace(/^\/+/, '')
+                .replace(/\\/g, '/');
+    
+            if (!globChars.some((char) => normalized.includes(char))) {
+                const lastSlash = normalized.lastIndexOf('/');
+                if (lastSlash > 0) {
+                    baseDirs.add(normalized.substring(0, lastSlash));
+                }
+                continue;
+            }
+    
+            const parts = normalized.split('/');
+            const basePathParts: string[] = [];
+    
+            for (const part of parts) {
+                if (globChars.some((char) => part.includes(char))) {
+                    break;
+                }
+                basePathParts.push(part);
+            }
+    
+            if (basePathParts.length > 0) {
+                const basePath = basePathParts.join('/');
+                baseDirs.add(basePath.replace(/\/+$/, ''));
+            }
+        }
+    
+        return Array.from(baseDirs)
+            .filter((dir) => dir.length > 0)
+            .sort();
     }
 
     async updateResponseToComment(params: {
