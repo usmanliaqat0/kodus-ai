@@ -91,7 +91,7 @@ Get started in minutes with our fully-managed solution:
 
 Deploy Kodus on your own infrastructure with full control:
 
-- [Installation Guide using our CLI](https://docs.kodus.io/self-hosted/installation)
+- [Installation Guide using our CLI](https://docs.kodus.io/how_to_deploy/en/deploy_kodus/generic_vm)
 - [Installation Guide using our Docker file](https://docs.kodus.io/how_to_deploy/en/deploy_kodus/generic_vm)
 
 ## Open Source vs. Cloud vs. Enterprise
